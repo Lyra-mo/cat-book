@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐱 小鱼干记账本</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: #FFF5ED;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+        }
+        .header h1 {
+            font-size: 28px;
+            color: #FF8A80;
+        }
+        .header p {
+            color: #8D6E63;
+            font-size: 14px;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .card-title {
+            font-weight: bold;
+            color: #5D4037;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .form-row input, .form-row select {
+            padding: 8px 12px;
+            border: 1px solid #E8DDD5;
+            border-radius: 8px;
+            font-size: 14px;
+            flex: 1;
+            min-width: 100px;
+            background: #FFF8F0;
+        }
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #FF8A80;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #FF6B5A;
+        }
+        .btn-danger {
+            background: #FFB5B5;
+            color: #5D4037;
+        }
+        .btn-danger:hover {
+            background: #FF8A8A;
+        }
+        .btn-success {
+            background: #B5EAD7;
+            color: #5D4037;
+        }
+        .btn-success:hover {
+            background: #8DD4BA;
+        }
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 1px solid #F5EDE5;
+        }
+        th {
+            color: #8D6E63;
+            font-weight: normal;
+            font-size: 12px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+        .stats-item {
+            padding: 10px;
+        }
+        .stats-item .number {
+            font-size: 22px;
+            font-weight: bold;
+            color: #5D4037;
+        }
+        .stats-item .label {
+            font-size: 12px;
+            color: #8D6E63;
+        }
+        .stats-item.income .number { color: #B5EAD7; }
+        .stats-item.expense .number { color: #FF8A80; }
+        .search-box {
+            display: flex;
+            gap: 10px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #E8DDD5;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            background: #F5EDE5;
+        }
+        .tag-income { background: #B5EAD7; }
+        .tag-expense { background: #FFD4C2; }
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #FFB5B5;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .delete-btn:hover { color: #FF6B6B; }
+        @media (max-width: 600px) {
+            .stats { flex-wrap: wrap; }
+            .form-row { flex-direction: column; }
+            table { font-size: 12px; }
+            th, td { padding: 6px 4px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🐱 小鱼干记账本</h1>
+        <p>🌸 今天也要好好记账哦 🌸</p>
+    </div>
+
+    <!-- 统计 -->
+    <div class="card">
+        <div class="stats" id="stats">
+            <div class="stats-item income">
+                <div class="number" id="income">¥0</div>
+                <div class="label">💰 收入</div>
+            </div>
+            <div class="stats-item expense">
+                <div class="number" id="expense">¥0</div>
+                <div class="label">💸 支出</div>
+            </div>
+            <div class="stats-item">
+                <div class="number" id="balance">¥0</div>
+                <div class="label">📊 结余</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加记录 -->
+    <div class="card">
+        <div class="card-title">✏️ 记一笔</div>
+        <div class="form-row">
+            <input type="date" id="date">
+            <select id="category">
+                <option value="🍜 餐饮">🍜 餐饮</option>
+                <option value="🚌 交通">🚌 交通</option>
+                <option value="🛍️ 购物">🛍️ 购物</option>
+                <option value="💰 工资">💰 工资</option>
+                <option value="🎮 娱乐">🎮 娱乐</option>
+                <option value="🏠 居家">🏠 居家</option>
+                <option value="其他">其他</option>
+            </select>
+            <input type="number" id="amount" placeholder="金额" step="0.01">
+            <input type="text" id="note" placeholder="备注">
+            <select id="type">
+                <option value="支出">💸 支出</option>
+                <option value="收入">💎 收入</option>
+            </select>
+            <button class="btn btn-primary" onclick="addRecord()">🎀 记好了！</button>
+        </div>
+    </div>
+
+    <!-- 搜索 -->
+    <div class="card">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 搜索备注..." oninput="searchRecords()">
+            <button class="btn btn-success btn-sm" onclick="loadRecords()">📋 全部</button>
+        </div>
+    </div>
+
+    <!-- 记录列表 -->
+    <div class="card">
+        <div class="card-title">📒 记账本</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>日期</th>
+                    <th>类别</th>
+                    <th>金额</th>
+                    <th>备注</th>
+                    <th>类型</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="recordList"></tbody>
+        </table>
+    </div>
+
+    <script>
+        // 设置默认日期
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+        function loadRecords() {
+            fetch('/api/records')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById('recordList');
+                    tbody.innerHTML = '';
+                    data.forEach(r => {
+                        const tr = document.createElement('tr');
+                        const typeClass = r.type === '收入' ? 'tag-income' : 'tag-expense';
+                        tr.innerHTML = `
+                            <td>${r.date}</td>
+                            <td>${r.category}</td>
+                            <td>¥${r.amount.toFixed(2)}</td>
+                            <td>${r.note || ''}</td>
+                            <td><span class="tag ${typeClass}">${r.type}</span></td>
+                            <td><button class="delete-btn" onclick="deleteRecord(${r.id})">✕</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                });
+            loadStats();
+        }
+
+        function loadStats() {
+            fetch('/api/stats')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('income').textContent = '¥' + data.income.toFixed(0);
+                    document.getElementById('expense').textContent = '¥' + data.expense.toFixed(0);
+                    document.getElementById('balance').textContent = '¥' + data.balance.toFixed(0);
+                });
+        }
+
+        function addRecord() {
+            const data = {
+                date: document.getElementById('date').value,
+                category: document.getElementById('category').value,
+                amount: parseFloat(document.getElementById('amount').value) || 0,
+                note: document.getElementById('note').value,
+                type: document.getElementById('type').value
+            };
+            fetch('/api/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).then(() => {
+                document.getElementById('amount').value = '';
+                document.getElementById('note').value = '';
+                loadRecords();
+            });
+        }
+
+        function deleteRecord(id) {
+            if (confirm('确定要删除这条记录吗？')) {
+                fetch('/api/delete/' + id, { method: 'DELETE' })
+                    .then(() => loadRecords());
+            }
+        }
+
+        function searchRecords() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            fetch('/api/records')
+                .then(res => res.json())
+                .then(data => {
+                    const filtered = data.filter(r => 
+                        r.note && r.note.toLowerCase().includes(keyword)
+                    );
+                    const tbody = document.getElementById('recordList');
+                    tbody.innerHTML = '';
+                    filtered.forEach(r => {
+                        const tr = document.createElement('tr');
+                        const typeClass = r.type === '收入' ? 'tag-income' : 'tag-expense';
+                        tr.innerHTML = `
+                            <td>${r.date}</td>
+                            <td>${r.category}</td>
+                            <td>¥${r.amount.toFixed(2)}</td>
+                            <td>${r.note || ''}</td>
+                            <td><span class="tag ${typeClass}">${r.type}</span></td>
+                            <td><button class="delete-btn" onclick="deleteRecord(${r.id})">✕</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                });
+        }
+
+        // 加载数据
+        loadRecords();
+    </script>
+</body>
+</html>
