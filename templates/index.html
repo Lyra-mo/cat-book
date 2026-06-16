@@ -72,13 +72,6 @@
         .btn-primary:hover {
             background: #FF6B5A;
         }
-        .btn-danger {
-            background: #FFB5B5;
-            color: #5D4037;
-        }
-        .btn-danger:hover {
-            background: #FF8A8A;
-        }
         .btn-success {
             background: #B5EAD7;
             color: #5D4037;
@@ -86,9 +79,21 @@
         .btn-success:hover {
             background: #8DD4BA;
         }
+        .btn-danger {
+            background: #FFB5B5;
+            color: #5D4037;
+        }
+        .btn-danger:hover {
+            background: #FF8A8A;
+        }
         .btn-sm {
             padding: 4px 12px;
             font-size: 12px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
         }
         table {
             width: 100%;
@@ -122,7 +127,7 @@
             font-size: 12px;
             color: #8D6E63;
         }
-        .stats-item.income .number { color: #B5EAD7; }
+        .stats-item.income .number { color: #4ECDC4; }
         .stats-item.expense .number { color: #FF8A80; }
         .search-box {
             display: flex;
@@ -152,11 +157,31 @@
             font-size: 16px;
         }
         .delete-btn:hover { color: #FF6B6B; }
+        .stats-info {
+            text-align: center;
+            color: #8D6E63;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        .category-tags {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+        }
+        .category-tag {
+            background: #F5EDE5;
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
         @media (max-width: 600px) {
             .stats { flex-wrap: wrap; }
             .form-row { flex-direction: column; }
             table { font-size: 12px; }
             th, td { padding: 6px 4px; }
+            .btn-group { flex-direction: column; }
         }
     </style>
 </head>
@@ -166,8 +191,12 @@
         <p>🌸 今天也要好好记账哦 🌸</p>
     </div>
 
-    <!-- 统计 -->
+    <!-- 统计卡片 -->
     <div class="card">
+        <div class="btn-group">
+            <button class="btn btn-primary" id="btnMonthly" onclick="switchStats('monthly')">📊 月度</button>
+            <button class="btn btn-success" id="btnWeekly" onclick="switchStats('weekly')">📅 周度</button>
+        </div>
         <div class="stats" id="stats">
             <div class="stats-item income">
                 <div class="number" id="income">¥0</div>
@@ -182,6 +211,8 @@
                 <div class="label">📊 结余</div>
             </div>
         </div>
+        <div class="stats-info" id="statsInfo">📆 本月统计</div>
+        <div class="category-tags" id="categoryStats"></div>
     </div>
 
     <!-- 添加记录 -->
@@ -235,8 +266,50 @@
     </div>
 
     <script>
+        let currentStats = 'monthly';
+
         // 设置默认日期
         document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+        function switchStats(type) {
+            currentStats = type;
+            document.getElementById('btnMonthly').className = type === 'monthly' ? 'btn btn-primary' : 'btn btn-success';
+            document.getElementById('btnWeekly').className = type === 'weekly' ? 'btn btn-primary' : 'btn btn-success';
+            loadStats();
+        }
+
+        function loadStats() {
+            const url = currentStats === 'monthly' ? '/api/monthly_stats' : '/api/weekly_stats';
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('income').textContent = '¥' + data.income.toFixed(0);
+                    document.getElementById('expense').textContent = '¥' + data.expense.toFixed(0);
+                    document.getElementById('balance').textContent = '¥' + data.balance.toFixed(0);
+                    
+                    const info = document.getElementById('statsInfo');
+                    if (currentStats === 'monthly') {
+                        info.textContent = `📆 ${data.year}年${data.month}月 统计`;
+                    } else {
+                        info.textContent = `📅 ${data.start} ~ ${data.end} 统计`;
+                    }
+                    
+                    const catDiv = document.getElementById('categoryStats');
+                    if (currentStats === 'monthly' && data.categories) {
+                        const entries = Object.entries(data.categories);
+                        if (entries.length > 0) {
+                            catDiv.innerHTML = entries
+                                .map(([cat, amount]) => 
+                                    `<span class="category-tag">${cat} ¥${amount.toFixed(0)}</span>`
+                                ).join('');
+                        } else {
+                            catDiv.innerHTML = '<span style="color:#8D6E63; font-size:13px;">暂无分类数据</span>';
+                        }
+                    } else {
+                        catDiv.innerHTML = '';
+                    }
+                });
+        }
 
         function loadRecords() {
             fetch('/api/records')
@@ -244,6 +317,10 @@
                 .then(data => {
                     const tbody = document.getElementById('recordList');
                     tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" style="color:#8D6E63; padding:20px;">还没有记录哦~ 记一笔吧 🐱</td></tr>';
+                        return;
+                    }
                     data.forEach(r => {
                         const tr = document.createElement('tr');
                         const typeClass = r.type === '收入' ? 'tag-income' : 'tag-expense';
@@ -261,29 +338,30 @@
             loadStats();
         }
 
-        function loadStats() {
-            fetch('/api/stats')
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('income').textContent = '¥' + data.income.toFixed(0);
-                    document.getElementById('expense').textContent = '¥' + data.expense.toFixed(0);
-                    document.getElementById('balance').textContent = '¥' + data.balance.toFixed(0);
-                });
-        }
-
         function addRecord() {
-            const data = {
-                date: document.getElementById('date').value,
-                category: document.getElementById('category').value,
-                amount: parseFloat(document.getElementById('amount').value) || 0,
-                note: document.getElementById('note').value,
-                type: document.getElementById('type').value
-            };
+            const date = document.getElementById('date').value;
+            const category = document.getElementById('category').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const note = document.getElementById('note').value;
+            const type = document.getElementById('type').value;
+
+            if (!date) {
+                alert('请选择日期哦 🐱');
+                return;
+            }
+            if (!amount || amount <= 0) {
+                alert('请输入正确的金额哦 🐱');
+                return;
+            }
+
+            const data = { date, category, amount, note, type };
             fetch('/api/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            }).then(() => {
+            })
+            .then(res => res.json())
+            .then(() => {
                 document.getElementById('amount').value = '';
                 document.getElementById('note').value = '';
                 loadRecords();
@@ -291,7 +369,7 @@
         }
 
         function deleteRecord(id) {
-            if (confirm('确定要删除这条记录吗？')) {
+            if (confirm('确定要删除这条记录吗？😿')) {
                 fetch('/api/delete/' + id, { method: 'DELETE' })
                     .then(() => loadRecords());
             }
@@ -307,6 +385,10 @@
                     );
                     const tbody = document.getElementById('recordList');
                     tbody.innerHTML = '';
+                    if (filtered.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" style="color:#8D6E63; padding:20px;">没有找到匹配的记录~</td></tr>';
+                        return;
+                    }
                     filtered.forEach(r => {
                         const tr = document.createElement('tr');
                         const typeClass = r.type === '收入' ? 'tag-income' : 'tag-expense';
