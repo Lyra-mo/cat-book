@@ -47,9 +47,7 @@ def get_stats():
         'categories': categories
     })
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
-    @app.route('/api/weekly_stats', methods=['GET'])
+@app.route('/api/weekly_stats', methods=['GET'])
 def get_weekly_stats():
     """获取本周统计"""
     from datetime import datetime, timedelta
@@ -92,3 +90,6 @@ def get_monthly_stats():
         'balance': income - expense,
         'categories': categories
     })
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
