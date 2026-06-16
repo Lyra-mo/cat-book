@@ -268,7 +268,6 @@
     <script>
         let currentStats = 'monthly';
 
-        // 设置默认日期
         document.getElementById('date').value = new Date().toISOString().split('T')[0];
 
         function switchStats(type) {
@@ -405,7 +404,6 @@
                 });
         }
 
-        // 加载数据
         loadRecords();
     </script>
 </body>
