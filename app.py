@@ -18,7 +18,7 @@ app.config['MAIL_SERVER'] = 'smtp.qq.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_SSL'] = True
 app.config['MAIL_USERNAME'] = 'fipped99@qq.com'
-app.config['MAIL_PASSWORD'] = 'ehbumojixycbdjie'
+app.config['MAIL_PASSWORD'] = 'qlppaqhjzoyzeaig'
 app.config['MAIL_DEFAULT_SENDER'] = 'fipped99@qq.com'
 mail = Mail(app)
 
