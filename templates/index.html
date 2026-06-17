@@ -4,17 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🐱 小鱼干记账本</title>
-    <!-- 引入 ECharts 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-    <!-- 引入圆体字体 -->
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
     <style>
-        /* ===== 全局重置 ===== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', 'Microsoft YaHei', cursive;
@@ -28,45 +21,24 @@
             min-height: 100vh;
         }
 
-        /* ===== 头部 ===== */
         .header {
             text-align: center;
             padding: 24px 20px 16px 20px;
             background: rgba(255, 245, 237, 0.75);
             backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             border-radius: 24px;
             margin-bottom: 28px;
             border: 1px solid rgba(255, 255, 255, 0.4);
             box-shadow: 0 4px 20px rgba(255, 138, 128, 0.08);
         }
-        .header h1 {
-            font-size: 32px;
-            color: #FF8A80;
-            letter-spacing: 2px;
-        }
-        .header .subtitle {
-            color: #8D6E63;
-            font-size: 15px;
-            margin-top: 4px;
-        }
-        .header .user-info {
-            margin-top: 10px;
-            font-size: 14px;
-            color: #8D6E63;
-        }
-        .header .user-info a {
-            color: #FF8A80;
-            text-decoration: none;
-            margin-left: 12px;
-            font-weight: bold;
-        }
+        .header h1 { font-size: 32px; color: #FF8A80; letter-spacing: 2px; }
+        .header .subtitle { color: #8D6E63; font-size: 15px; margin-top: 4px; }
+        .header .user-info { margin-top: 10px; font-size: 14px; color: #8D6E63; }
+        .header .user-info a { color: #FF8A80; text-decoration: none; margin-left: 12px; font-weight: bold; }
 
-        /* ===== 卡片 ===== */
         .card {
             background: rgba(255, 255, 255, 0.78);
             backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             border-radius: 24px;
             padding: 24px 26px;
             margin-bottom: 24px;
@@ -74,68 +46,21 @@
             border: 1px solid rgba(255, 255, 255, 0.5);
             transition: box-shadow 0.2s;
         }
-        .card:hover {
-            box-shadow: 0 6px 24px rgba(255, 138, 128, 0.08), 0 1px 4px rgba(0, 0, 0, 0.02);
-        }
-        .card-title {
-            font-weight: bold;
-            color: #5D4037;
-            margin-bottom: 16px;
-            font-size: 18px;
-            letter-spacing: 1px;
-        }
+        .card:hover { box-shadow: 0 6px 24px rgba(255, 138, 128, 0.08), 0 1px 4px rgba(0, 0, 0, 0.02); }
+        .card-title { font-weight: bold; color: #5D4037; margin-bottom: 16px; font-size: 18px; letter-spacing: 1px; }
 
-        /* ===== 按钮组 ===== */
-        .btn-group {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 18px;
-            flex-wrap: wrap;
-        }
+        .btn-group { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
         .btn {
-            padding: 10px 28px;
-            border: none;
-            border-radius: 50px;
-            font-size: 16px;
-            font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', cursive;
-            cursor: pointer;
-            transition: all 0.25s;
-            letter-spacing: 1px;
+            padding: 10px 28px; border: none; border-radius: 50px; font-size: 16px;
+            font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', cursive; cursor: pointer;
+            transition: all 0.25s; letter-spacing: 1px;
         }
-        .btn-primary {
-            background: #FF8A80;
-            color: white;
-            box-shadow: 0 4px 12px rgba(255, 138, 128, 0.25);
-        }
-        .btn-primary:hover {
-            background: #FF6B5A;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 138, 128, 0.35);
-        }
-        .btn-success {
-            background: #B5EAD7;
-            color: #3D6B5A;
-            box-shadow: 0 4px 12px rgba(181, 234, 215, 0.25);
-        }
-        .btn-success:hover {
-            background: #8DD4BA;
-            transform: translateY(-2px);
-        }
-        .btn-outline {
-            background: transparent;
-            color: #8D6E63;
-            border: 2px solid #E8DDD5;
-        }
-        .btn-outline:hover {
-            background: #F5EDE5;
-        }
-        .btn-sm {
-            padding: 6px 16px;
-            font-size: 13px;
-            border-radius: 50px;
-        }
+        .btn-primary { background: #FF8A80; color: white; box-shadow: 0 4px 12px rgba(255, 138, 128, 0.25); }
+        .btn-primary:hover { background: #FF6B5A; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255, 138, 128, 0.35); }
+        .btn-success { background: #B5EAD7; color: #3D6B5A; box-shadow: 0 4px 12px rgba(181, 234, 215, 0.25); }
+        .btn-success:hover { background: #8DD4BA; transform: translateY(-2px); }
+        .btn-sm { padding: 6px 16px; font-size: 13px; border-radius: 50px; }
 
-        /* ===== 统计数据 ===== */
         .stats {
             display: flex;
             justify-content: space-around;
@@ -143,32 +68,22 @@
             flex-wrap: wrap;
             gap: 4px;
         }
-        .stats-item {
-            padding: 6px 12px;
-            flex: 1;
-            min-width: 80px;
-        }
-        .stats-item .number {
-            font-size: 26px;
-            font-weight: bold;
-        }
-        .stats-item .label {
-            font-size: 13px;
-            color: #8D6E63;
-        }
-        .stats-item.income .number { color: #4ECDC4; }
-        .stats-item.expense .number { color: #FF8A80; }
-        .stats-item.balance .number { color: #74B9FF; }
+        .stats-item { padding: 6px 12px; flex: 1; min-width: 80px; }
+        .stats-item .number { font-size: 22px; font-weight: bold; }
+        .stats-item .label { font-size: 13px; color: #8D6E63; }
+        .stats-item.income .number { font-size: 22px; color: #4ECDC4; }
+        .stats-item.expense .number { font-size: 28px; color: #FF8A80; font-weight: 900; }
+        .stats-item.balance .number { font-size: 26px; color: #74B9FF; font-weight: 700; }
 
         .stats-info {
             text-align: center;
             color: #8D6E63;
             font-size: 15px;
-            margin-top: 12px;
+            margin-top: 6px;
+            margin-bottom: 6px;
             letter-spacing: 1px;
         }
 
-        /* ===== 表单 ===== */
         .form-row {
             display: flex;
             flex-wrap: wrap;
@@ -176,8 +91,7 @@
             margin-bottom: 10px;
             align-items: center;
         }
-        .form-row input,
-        .form-row select {
+        .form-row input, .form-row select {
             padding: 10px 16px;
             border: 2px solid #E8DDD5;
             border-radius: 16px;
@@ -188,24 +102,14 @@
             font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', cursive;
             transition: border 0.2s, box-shadow 0.2s;
         }
-        .form-row input:focus,
-        .form-row select:focus {
+        .form-row input:focus, .form-row select:focus {
             border-color: #FF8A80;
             outline: none;
             box-shadow: 0 0 0 4px rgba(255, 138, 128, 0.1);
         }
-        .form-row .btn {
-            flex: 0 0 auto;
-            border-radius: 50px;
-        }
+        .form-row .btn { flex: 0 0 auto; border-radius: 50px; }
 
-        /* ===== 搜索 ===== */
-        .search-box {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
+        .search-box { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .search-box input {
             flex: 1;
             padding: 10px 18px;
@@ -222,100 +126,48 @@
             box-shadow: 0 0 0 4px rgba(255, 138, 128, 0.1);
         }
 
-        /* ===== 表格 ===== */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 15px;
-        }
-        th,
-        td {
-            padding: 12px 8px;
-            text-align: center;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-        }
-        th {
-            color: #8D6E63;
-            font-weight: normal;
-            font-size: 14px;
-            letter-spacing: 1px;
-        }
-        tr:hover {
-            background: rgba(255, 138, 128, 0.04);
-        }
+        table { width: 100%; border-collapse: collapse; font-size: 15px; }
+        th, td { padding: 12px 8px; text-align: center; border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
+        th { color: #8D6E63; font-weight: normal; font-size: 14px; letter-spacing: 1px; }
+        tr:hover { background: rgba(255, 138, 128, 0.04); }
 
-        /* ===== 标签 ===== */
-        .tag {
-            display: inline-block;
-            padding: 4px 14px;
-            border-radius: 50px;
-            font-size: 13px;
-        }
+        .tag { display: inline-block; padding: 4px 14px; border-radius: 50px; font-size: 13px; }
         .tag-income { background: #B5EAD7; color: #2D6A4F; }
         .tag-expense { background: #FFD4C2; color: #8D4A3B; }
 
-        /* ===== 删除按钮 ===== */
         .delete-btn {
-            background: none;
-            border: none;
-            color: #FFB5B5;
-            cursor: pointer;
-            font-size: 18px;
-            transition: 0.2s;
-            padding: 4px 8px;
-            border-radius: 50%;
+            background: none; border: none; color: #FFB5B5; cursor: pointer;
+            font-size: 18px; transition: 0.2s; padding: 4px 8px; border-radius: 50%;
         }
-        .delete-btn:hover {
-            color: #FF6B6B;
-            background: rgba(255, 107, 107, 0.08);
-            transform: scale(1.15);
-        }
+        .delete-btn:hover { color: #FF6B6B; background: rgba(255, 107, 107, 0.08); transform: scale(1.15); }
 
-        /* ===== 图表容器 ===== */
-        .chart-container {
-            width: 100%;
-            height: 260px;
-            margin-top: 8px;
-        }
+        .chart-container { width: 100%; height: 260px; margin-top: 4px; }
 
-        /* ===== 分类标签（饼图下方） ===== */
         .category-tags {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
             justify-content: center;
-            margin-top: 12px;
+            margin-top: 10px;
         }
         .category-tag {
-            padding: 4px 18px;
+            padding: 4px 16px;
             border-radius: 50px;
-            font-size: 14px;
+            font-size: 13px;
             background: rgba(245, 237, 229, 0.7);
             border: 1px solid rgba(0, 0, 0, 0.04);
         }
 
-        /* ===== 空状态 ===== */
-        .empty-state {
-            text-align: center;
-            padding: 32px 0;
-            color: #B5A59A;
-            font-size: 18px;
-        }
-        .empty-state .big-emoji {
-            font-size: 48px;
-            display: block;
-            margin-bottom: 10px;
-        }
+        .empty-state { text-align: center; padding: 32px 0; color: #B5A59A; font-size: 18px; }
+        .empty-state .big-emoji { font-size: 48px; display: block; margin-bottom: 10px; }
 
-        /* ===== 饼图配色（固定） ===== */
-        /* 饼图颜色通过 ECharts 的 color 数组控制，在 JS 中已配置 */
-
-        /* ===== 响应式 ===== */
         @media (max-width: 600px) {
             body { padding: 16px 12px 30px 12px; }
             .card { padding: 18px 16px; margin-bottom: 18px; }
             .stats { flex-wrap: wrap; gap: 4px; }
-            .stats-item .number { font-size: 22px; }
+            .stats-item .number { font-size: 18px; }
+            .stats-item.expense .number { font-size: 22px; }
+            .stats-item.balance .number { font-size: 20px; }
             .form-row { flex-direction: column; }
             .form-row .btn { width: 100%; }
             table { font-size: 13px; }
@@ -326,18 +178,10 @@
             .header h1 { font-size: 26px; }
             .header { padding: 16px 14px; margin-bottom: 20px; }
         }
-
-        /* ===== 其他 ===== */
-        .text-muted {
-            color: #B5A59A;
-        }
-        .mt-1 { margin-top: 8px; }
-        .mt-2 { margin-top: 16px; }
     </style>
 </head>
 <body>
 
-    <!-- ===== 头部 ===== -->
     <div class="header">
         <h1>🐱 小鱼干记账本</h1>
         <div class="subtitle">🌸 今天也要好好记账哦 🌸</div>
@@ -349,7 +193,7 @@
         </div>
     </div>
 
-    <!-- ===== 统计卡片 ===== -->
+    <!-- 统计卡片 -->
     <div class="card">
         <div class="btn-group">
             <button class="btn btn-primary" id="btnMonthly" onclick="switchStats('monthly')">📊 月度</button>
@@ -358,7 +202,7 @@
 
         <div class="stats" id="stats">
             <div class="stats-item income">
-                <div class="number" id="income">¥0</div>
+                <div class="number" id="income">暂无收入</div>
                 <div class="label">💰 收入</div>
             </div>
             <div class="stats-item expense">
@@ -372,14 +216,11 @@
         </div>
 
         <div class="stats-info" id="statsInfo">📆 本月统计</div>
-
-        <!-- 饼图 -->
         <div class="chart-container" id="pieChart"></div>
-
         <div class="category-tags" id="categoryStats"></div>
     </div>
 
-    <!-- ===== 记一笔 ===== -->
+    <!-- 记一笔 -->
     <div class="card">
         <div class="card-title">✏️ 记一笔</div>
         <div class="form-row">
@@ -404,7 +245,7 @@
         </div>
     </div>
 
-    <!-- ===== 搜索 ===== -->
+    <!-- 搜索 -->
     <div class="card">
         <div class="search-box">
             <input type="text" id="searchInput" placeholder="🔍 搜索备注..." oninput="searchRecords()">
@@ -412,19 +253,12 @@
         </div>
     </div>
 
-    <!-- ===== 记账本 ===== -->
+    <!-- 记账本 -->
     <div class="card">
         <div class="card-title">📒 记账本</div>
         <table>
             <thead>
-                <tr>
-                    <th>日期</th>
-                    <th>类别</th>
-                    <th>金额</th>
-                    <th>备注</th>
-                    <th>类型</th>
-                    <th></th>
-                </tr>
+                <tr><th>日期</th><th>类别</th><th>金额</th><th>备注</th><th>类型</th><th></th></tr>
             </thead>
             <tbody id="recordList"></tbody>
         </table>
@@ -448,9 +282,19 @@
             fetch(url)
                 .then(res => res.json())
                 .then(data => {
-                    document.getElementById('income').textContent = '¥' + data.income.toFixed(0);
-                    document.getElementById('expense').textContent = '¥' + data.expense.toFixed(0);
-                    document.getElementById('balance').textContent = '¥' + data.balance.toFixed(0);
+                    const categories = data.categories || {};
+                    const totalExpense = Object.values(categories).reduce((a, b) => a + b, 0);
+
+                    // 收入
+                    if (data.income > 0) {
+                        document.getElementById('income').textContent = '¥' + data.income.toFixed(0);
+                    } else {
+                        document.getElementById('income').textContent = '暂无收入';
+                    }
+
+                    // 支出（用分类总和保证一致性）
+                    document.getElementById('expense').textContent = '¥' + totalExpense.toFixed(0);
+                    document.getElementById('balance').textContent = '¥' + (data.income - totalExpense).toFixed(0);
 
                     const info = document.getElementById('statsInfo');
                     if (currentStats === 'monthly') {
@@ -460,25 +304,21 @@
                     }
 
                     const catDiv = document.getElementById('categoryStats');
-                    if (currentStats === 'monthly' && data.categories) {
-                        const entries = Object.entries(data.categories);
-                        if (entries.length > 0) {
-                            catDiv.innerHTML = entries
-                                .map(([cat, amount]) =>
-                                    `<span class="category-tag">${cat} ¥${amount.toFixed(0)}</span>`
-                                ).join('');
-                        } else {
-                            catDiv.innerHTML = '<span class="text-muted">暂无分类数据</span>';
-                        }
+                    const entries = Object.entries(categories);
+                    if (entries.length > 0) {
+                        catDiv.innerHTML = entries
+                            .map(([cat, amount]) =>
+                                `<span class="category-tag">${cat} ¥${amount.toFixed(0)}</span>`
+                            ).join('');
                     } else {
-                        catDiv.innerHTML = '';
+                        catDiv.innerHTML = '<span style="color:#B5A59A;">暂无分类数据</span>';
                     }
 
-                    updatePieChart(data.categories || {});
+                    updatePieChart(categories, totalExpense);
                 });
         }
 
-        function updatePieChart(categories) {
+        function updatePieChart(categories, totalExpense) {
             const chartDom = document.getElementById('pieChart');
             if (!pieChartInstance) {
                 pieChartInstance = echarts.init(chartDom);
@@ -486,13 +326,18 @@
 
             const entries = Object.entries(categories);
             let chartData = [];
-            if (entries.length === 0) {
-                chartData = [{ name: '暂无数据', value: 1 }];
+            let hasData = false;
+
+            if (entries.length > 0 && totalExpense > 0) {
+                hasData = true;
+                chartData = entries.map(([name, value]) => ({
+                    name,
+                    value: Math.round(value * 100) / 100
+                }));
             } else {
-                chartData = entries.map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }));
+                chartData = [{ name: '暂无数据', value: 1 }];
             }
 
-            // 固定饼图配色：购物暖黄、餐饮浅红、其他浅橘、交通浅蓝、工资浅绿、娱乐浅紫
             const colorMap = {
                 '购物': '#FFD93D',
                 '餐饮': '#FF8A80',
@@ -514,19 +359,19 @@
                     left: 'center',
                     top: 'bottom',
                     textStyle: {
-                        fontSize: 13,
+                        fontSize: 12,
                         fontFamily: 'ZCOOL KuaiLe, Comic Sans MS, cursive',
                         color: '#5D4037'
                     },
-                    itemWidth: 14,
-                    itemHeight: 14,
-                    borderRadius: 7
+                    itemWidth: 12,
+                    itemHeight: 12,
+                    itemGap: 8
                 },
                 color: pieColors,
                 series: [{
                     type: 'pie',
-                    radius: ['40%', '70%'],
-                    center: ['50%', '42%'],
+                    radius: ['42%', '72%'],
+                    center: ['50%', '44%'],
                     avoidLabelOverlap: true,
                     itemStyle: {
                         borderRadius: 10,
@@ -534,7 +379,7 @@
                         borderWidth: 3
                     },
                     label: {
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: 'bold',
                         fontFamily: 'ZCOOL KuaiLe, Comic Sans MS, cursive',
                         color: '#5D4037',
@@ -542,7 +387,7 @@
                     },
                     labelLine: {
                         length: 12,
-                        length2: 16
+                        length2: 14
                     },
                     emphasis: {
                         scale: true,
@@ -550,17 +395,20 @@
                     },
                     data: chartData
                 }],
-                graphic: entries.length === 0 ? [{
+                graphic: [{
                     type: 'text',
                     left: 'center',
                     top: 'center',
                     style: {
-                        text: '🐱 还没有记录哦',
-                        fontSize: 18,
+                        text: hasData ? `本月总支出\n¥${totalExpense.toFixed(0)}` : '🐱 还没有记录哦',
+                        fontSize: hasData ? 18 : 16,
+                        fontWeight: 'bold',
                         fontFamily: 'ZCOOL KuaiLe, Comic Sans MS, cursive',
-                        fill: '#B5A59A'
+                        fill: hasData ? '#5D4037' : '#B5A59A',
+                        textAlign: 'center',
+                        lineHeight: 28
                     }
-                }] : []
+                }]
             };
 
             pieChartInstance.setOption(option, true);
@@ -575,14 +423,12 @@
                     tbody.innerHTML = '';
                     if (data.length === 0) {
                         tbody.innerHTML = `
-                            <tr>
-                                <td colspan="6">
-                                    <div class="empty-state">
-                                        <span class="big-emoji">😿</span>
-                                        还没有记录哦~ 记一笔吧 🐱
-                                    </div>
-                                </td>
-                            </tr>
+                            <tr><td colspan="6">
+                                <div class="empty-state">
+                                    <span class="big-emoji">😿</span>
+                                    还没有记录哦~ 记一笔吧 🐱
+                                </div>
+                            </td></tr>
                         `;
                         return;
                     }
@@ -610,24 +456,14 @@
             const note = document.getElementById('note').value.trim();
             const type = document.getElementById('type').value;
 
-            if (!date) {
-                alert('请选择日期哦 🐱');
-                return;
-            }
-            if (!category) {
-                alert('请输入或选择类别哦 🐱');
-                return;
-            }
-            if (!amount || amount <= 0) {
-                alert('请输入正确的金额哦 🐱');
-                return;
-            }
+            if (!date) { alert('请选择日期哦 🐱'); return; }
+            if (!category) { alert('请输入或选择类别哦 🐱'); return; }
+            if (!amount || amount <= 0) { alert('请输入正确的金额哦 🐱'); return; }
 
-            const data = { date, category, amount, note, type };
             fetch('/api/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: JSON.stringify({ date, category, amount, note, type })
             })
             .then(res => res.json())
             .then(() => {
@@ -650,21 +486,17 @@
             fetch('/api/records')
                 .then(res => res.json())
                 .then(data => {
-                    const filtered = data.filter(r =>
-                        r.note && r.note.toLowerCase().includes(keyword)
-                    );
+                    const filtered = data.filter(r => r.note && r.note.toLowerCase().includes(keyword));
                     const tbody = document.getElementById('recordList');
                     tbody.innerHTML = '';
                     if (filtered.length === 0) {
                         tbody.innerHTML = `
-                            <tr>
-                                <td colspan="6">
-                                    <div class="empty-state">
-                                        <span class="big-emoji">🔍</span>
-                                        没有找到匹配的记录~
-                                    </div>
-                                </td>
-                            </tr>
+                            <tr><td colspan="6">
+                                <div class="empty-state">
+                                    <span class="big-emoji">🔍</span>
+                                    没有找到匹配的记录~
+                                </div>
+                            </td></tr>
                         `;
                         return;
                     }
@@ -685,9 +517,7 @@
         }
 
         window.addEventListener('resize', () => {
-            if (pieChartInstance) {
-                pieChartInstance.resize();
-            }
+            if (pieChartInstance) pieChartInstance.resize();
         });
 
         loadRecords();
