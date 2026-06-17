@@ -13,11 +13,11 @@ import requests
 app = Flask(__name__)
 app.secret_key = 'supersecretkey123456'
 
-# ===== Brevo 邮件配置 =====
+# ===== Brevo 邮件配置（保留但不再强制使用） =====
 BREVO_API_KEY = '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'
 
 def send_email(to_email, subject, body):
-    """通过 Brevo API 发送邮件"""
+    """通过 Brevo API 发送邮件（备用）"""
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
         "accept": "application/json",
@@ -66,7 +66,7 @@ def init_db():
         )
     ''')
     
-    # ===== 检查并添加 reset_token 字段 =====
+    # ===== 检查并添加字段 =====
     cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users'")
     columns = [row[0] for row in cur.fetchall()]
     
@@ -275,39 +275,37 @@ def index():
     username = user['username'] if user else '用户'
     return render_template('index.html', username=username, email=current_user.email)
 
-# ===== 忘记密码 =====
+# ===== 忘记密码（安全问题方式） =====
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
         email = request.form.get('email')
         user = get_user(email)
+        
         if not user:
             flash('😿 该邮箱未注册', 'danger')
             return render_template('forgot_password.html')
         
-        token = str(uuid.uuid4())
-        expiry = str(datetime.now().timestamp() + 900)  # 15分钟
+        # 如果用户已经输入了安全答案（第二步）
+        if request.form.get('security_answer'):
+            answer = request.form.get('security_answer')
+            if user['security_answer'] and user['security_answer'] == answer:
+                # 验证通过，生成 token 跳转到重置密码
+                token = str(uuid.uuid4())
+                expiry = str(datetime.now().timestamp() + 900)
+                update_user_token(email, token, expiry)
+                flash('🎀 身份验证通过，请设置新密码', 'success')
+                return redirect(url_for('reset_password', token=token))
+            else:
+                flash('😿 安全答案错误，请重试', 'danger')
+                return render_template('forgot_password.html', question=user['security_question'], email=email)
         
-        update_user_token(email, token, expiry)
-        
-        body = f'''你好 {user['username']}，
-
-你请求了重置密码。请点击以下链接（15分钟内有效）：
-
-https://cat-book-62zc.onrender.com/reset_password?token={token}
-
-如果这不是你本人的操作，请忽略此邮件。
-
-🐱 小鱼干记账本
-'''
-        
-        success = send_email(email, '🐱 重置你的小鱼干记账本密码', body)
-        if success:
-            flash('📧 重置邮件已发送，请查收（15分钟有效）', 'success')
+        # 第一步：显示安全问题
+        if user.get('security_question'):
+            return render_template('forgot_password.html', question=user['security_question'], email=email)
         else:
-            flash('😿 邮件发送失败，请稍后重试', 'danger')
-        
-        return redirect(url_for('login'))
+            flash('😿 该用户未设置安全问题，请联系管理员', 'danger')
+            return render_template('forgot_password.html')
     
     return render_template('forgot_password.html')
 
@@ -353,7 +351,7 @@ def reset_password():
     
     return render_template('reset_password.html', token=token)
 
-# ===== 测试邮件路由 =====
+# ===== 测试邮件路由（备用） =====
 @app.route('/test_email')
 def test_email():
     success = send_email('fipped99@qq.com', '🐱 测试邮件', '这是一封测试邮件，如果你收到了，说明邮件功能正常！')
