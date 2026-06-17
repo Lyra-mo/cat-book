@@ -1,24 +1,34 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_mail import Mail, Message
 from datetime import datetime
 import json
 import os
 import bcrypt
 import re
+import uuid
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey123456'
+app.secret_key = 'supersecretkey123456'   # 生产环境请更换
+
+# ===== 邮件配置（请修改为你的邮箱和授权码） =====
+app.config['MAIL_SERVER'] = 'smtp.qq.com'          # QQ邮箱
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = '你的QQ邮箱@qq.com'   # 改成你的邮箱
+app.config['MAIL_PASSWORD'] = '你的授权码'          # 改成SMTP授权码（不是QQ密码）
+app.config['MAIL_DEFAULT_SENDER'] = '你的QQ邮箱@qq.com'
+mail = Mail(app)
 
 # ===== 数据库连接 =====
 def get_db_connection():
-    """获取数据库连接"""
     database_url = os.environ.get('DATABASE_URL')
     if database_url:
         return psycopg2.connect(database_url)
     else:
-        # 本地开发用
+        # 本地开发（如果没有 DATABASE_URL 环境变量）
         return psycopg2.connect(
             host='localhost',
             database='catbook',
@@ -27,17 +37,19 @@ def get_db_connection():
         )
 
 def init_db():
-    """初始化数据库表"""
+    """初始化数据库表（包含 reset_token 字段）"""
     conn = get_db_connection()
     cur = conn.cursor()
     
-    # 用户表
+    # 用户表（增加 reset_token 和 reset_token_expiry）
     cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
             email TEXT PRIMARY KEY,
             username TEXT NOT NULL,
             password TEXT NOT NULL,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            reset_token TEXT,
+            reset_token_expiry TEXT
         )
     ''')
     
@@ -78,6 +90,24 @@ def save_user(email, username, hashed_password, created_at):
         'INSERT INTO users (email, username, password, created_at) VALUES (%s, %s, %s, %s)',
         (email, username, hashed_password, created_at)
     )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def update_user_token(email, token, expiry):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('UPDATE users SET reset_token = %s, reset_token_expiry = %s WHERE email = %s',
+                (token, expiry, email))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def update_user_password(email, new_hashed_password):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('UPDATE users SET password = %s, reset_token = NULL, reset_token_expiry = NULL WHERE email = %s',
+                (new_hashed_password, email))
     conn.commit()
     cur.close()
     conn.close()
@@ -135,6 +165,11 @@ def load_user(email):
         return User(email)
     return None
 
+# ===== 静态文件路由（确保背景图能被访问） =====
+@app.route('/bg_pattern.png')
+def serve_bg():
+    return send_file('bg_pattern.png', mimetype='image/png')
+
 # ===== 路由 =====
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -144,7 +179,6 @@ def login():
         password = request.form.get('password')
         
         user = get_user(email)
-        
         if user:
             stored_password = user['password']
             if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
@@ -169,15 +203,12 @@ def register():
         if not is_valid_email(email):
             flash('😿 邮箱格式不正确', 'danger')
             return render_template('register.html')
-        
         if not username or len(username) < 2:
             flash('😿 昵称至少2个字符', 'danger')
             return render_template('register.html')
-        
         if not password or len(password) < 4:
             flash('😿 密码至少4个字符', 'danger')
             return render_template('register.html')
-        
         if password != confirm_password:
             flash('😿 两次密码不一致', 'danger')
             return render_template('register.html')
@@ -209,7 +240,88 @@ def index():
     username = user['username'] if user else '用户'
     return render_template('index.html', username=username, email=current_user.email)
 
-# ===== API =====
+# ===== 忘记密码 =====
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        user = get_user(email)
+        if not user:
+            flash('😿 该邮箱未注册', 'danger')
+            return render_template('forgot_password.html')
+        
+        # 生成 token
+        token = str(uuid.uuid4())
+        expiry = str(datetime.now().timestamp() + 900)  # 15分钟
+        
+        update_user_token(email, token, expiry)
+        
+        # 发送邮件
+        reset_link = f"https://cat-book-xxx.onrender.com/reset_password?token={token}"  # 替换为你的域名
+        msg = Message('🐱 重置你的小鱼干记账本密码',
+                      recipients=[email])
+        msg.body = f'''你好 {user['username']}，
+
+你请求了重置密码。请点击以下链接（15分钟内有效）：
+
+{reset_link}
+
+如果这不是你本人的操作，请忽略此邮件。
+
+🐱 小鱼干记账本
+'''
+        mail.send(msg)
+        
+        flash('📧 重置邮件已发送，请查收（15分钟有效）', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('forgot_password.html')
+
+@app.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    token = request.args.get('token')
+    if not token:
+        flash('😿 无效的链接', 'danger')
+        return redirect(url_for('login'))
+    
+    # 验证 token
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute('SELECT * FROM users WHERE reset_token = %s', (token,))
+    user = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not user:
+        flash('😿 无效的链接', 'danger')
+        return redirect(url_for('login'))
+    
+    # 检查是否过期
+    now = datetime.now().timestamp()
+    if float(user['reset_token_expiry']) < now:
+        flash('😿 链接已过期，请重新申请', 'danger')
+        return redirect(url_for('forgot_password'))
+    
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm = request.form.get('confirm_password')
+        
+        if not password or len(password) < 4:
+            flash('😿 密码至少4个字符', 'danger')
+            return render_template('reset_password.html', token=token)
+        if password != confirm:
+            flash('😿 两次密码不一致', 'danger')
+            return render_template('reset_password.html', token=token)
+        
+        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        update_user_password(user['email'], hashed.decode('utf-8'))
+        
+        flash('🎀 密码重置成功！请用新密码登录', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('reset_password.html', token=token)
+
+# ===== API 接口 =====
 
 @app.route('/api/records', methods=['GET'])
 @login_required
