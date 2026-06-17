@@ -2,3 +2,4 @@ Flask
 flask-login
 bcrypt
 psycopg2-binary
+Flask-Mail
