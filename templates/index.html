@@ -14,23 +14,26 @@
             padding: 0;
             box-sizing: border-box;
         }
-       body {
-    font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', 'Microsoft YaHei', cursive;
-    background-image: url('/bg_pattern.png');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    padding: 20px;
-    max-width: 900px;
-    margin: 0 auto;
-    min-height: 100vh;
-}
+        body {
+            font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', 'Microsoft YaHei', cursive;
+            background-image: url('/bg_pattern.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+            min-height: 100vh;
+        }
         .header {
             text-align: center;
             padding: 20px 0 10px 0;
-            background: rgba(255, 245, 237, 0.7);
+            background: rgba(255, 245, 237, 0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             border-radius: 30px;
             margin-bottom: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
         .header h1 {
             font-size: 32px;
@@ -54,14 +57,14 @@
             font-weight: bold;
         }
         .card {
-            background: rgba(255, 255, 255, 0.75);
+            background: rgba(255, 255, 255, 0.78);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-radius: 28px;
             padding: 22px 24px;
             margin-bottom: 18px;
             box-shadow: 0 8px 32px rgba(255, 138, 128, 0.12);
-            border: 1px solid rgba(255, 255, 255, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.5);
         }
         .card-title {
             font-weight: bold;
@@ -199,7 +202,7 @@
         th, td {
             padding: 12px 8px;
             text-align: center;
-            border-bottom: 1px solid #F5EDE5;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
         }
         th {
             color: #8D6E63;
@@ -238,7 +241,7 @@
             margin-top: 8px;
         }
         .category-tag {
-            background: #F5EDE5;
+            background: rgba(245, 237, 229, 0.8);
             padding: 4px 16px;
             border-radius: 50px;
             font-size: 14px;
@@ -281,7 +284,7 @@
         </div>
     </div>
 
-    <!-- ===== 统计卡片（含图表） ===== -->
+    <!-- ===== 统计卡片 ===== -->
     <div class="card">
         <div class="btn-group">
             <button class="btn btn-primary" id="btnMonthly" onclick="switchStats('monthly')">📊 月度</button>
@@ -366,10 +369,8 @@
         let currentStats = 'monthly';
         let pieChartInstance = null;
 
-        // ===== 初始化日期 =====
         document.getElementById('date').value = new Date().toISOString().split('T')[0];
 
-        // ===== 切换周度/月度 =====
         function switchStats(type) {
             currentStats = type;
             document.getElementById('btnMonthly').className = type === 'monthly' ? 'btn btn-primary' : 'btn btn-success';
@@ -377,7 +378,6 @@
             loadStats();
         }
 
-        // ===== 加载统计数据 =====
         function loadStats() {
             const url = currentStats === 'monthly' ? '/api/monthly_stats' : '/api/weekly_stats';
             fetch(url)
@@ -394,7 +394,6 @@
                         info.textContent = `📅 ${data.start} ~ ${data.end} 统计`;
                     }
 
-                    // 更新分类标签
                     const catDiv = document.getElementById('categoryStats');
                     if (currentStats === 'monthly' && data.categories) {
                         const entries = Object.entries(data.categories);
@@ -410,12 +409,10 @@
                         catDiv.innerHTML = '';
                     }
 
-                    // 更新饼图
                     updatePieChart(data.categories || {});
                 });
         }
 
-        // ===== 更新饼图 =====
         function updatePieChart(categories) {
             const chartDom = document.getElementById('pieChart');
             if (!pieChartInstance) {
@@ -493,7 +490,6 @@
             pieChartInstance.resize();
         }
 
-        // ===== 加载记录 =====
         function loadRecords() {
             fetch('/api/records')
                 .then(res => res.json())
@@ -530,7 +526,6 @@
             loadStats();
         }
 
-        // ===== 添加记录（支持自定义分类） =====
         function addRecord() {
             const date = document.getElementById('date').value;
             const category = document.getElementById('category').value.trim();
@@ -566,7 +561,6 @@
             });
         }
 
-        // ===== 删除记录 =====
         function deleteRecord(id) {
             if (confirm('😿 真的要删掉这条小鱼干记录吗？')) {
                 fetch('/api/delete/' + id, { method: 'DELETE' })
@@ -574,7 +568,6 @@
             }
         }
 
-        // ===== 搜索记录 =====
         function searchRecords() {
             const keyword = document.getElementById('searchInput').value.toLowerCase();
             fetch('/api/records')
@@ -614,14 +607,12 @@
                 });
         }
 
-        // ===== 窗口大小变化时重绘图表 =====
         window.addEventListener('resize', () => {
             if (pieChartInstance) {
                 pieChartInstance.resize();
             }
         });
 
-        // ===== 加载数据 =====
         loadRecords();
     </script>
 </body>
