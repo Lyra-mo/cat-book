@@ -11,15 +11,15 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey123456'   # 生产环境请更换
+app.secret_key = 'supersecretkey123456'
 
-# ===== 邮件配置（请修改为你的邮箱和授权码） =====
-app.config['MAIL_SERVER'] = 'smtp.qq.com'          # QQ邮箱
+# ===== 邮件配置（已填入你的授权码） =====
+app.config['MAIL_SERVER'] = 'smtp.qq.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USERNAME'] = '你的QQ邮箱@qq.com'   # 改成你的邮箱
-app.config['MAIL_PASSWORD'] = '你的授权码'          # 改成SMTP授权码（不是QQ密码）
-app.config['MAIL_DEFAULT_SENDER'] = '你的QQ邮箱@qq.com'
+app.config['MAIL_USERNAME'] = '你的QQ邮箱@qq.com'   # 改成你的QQ邮箱
+app.config['MAIL_PASSWORD'] = 'ehbumojixycbdjie'   # ✅ 已填入你的授权码
+app.config['MAIL_DEFAULT_SENDER'] = '你的QQ邮箱@qq.com'  # 改成你的QQ邮箱
 mail = Mail(app)
 
 # ===== 数据库连接 =====
@@ -28,7 +28,6 @@ def get_db_connection():
     if database_url:
         return psycopg2.connect(database_url)
     else:
-        # 本地开发（如果没有 DATABASE_URL 环境变量）
         return psycopg2.connect(
             host='localhost',
             database='catbook',
@@ -37,11 +36,9 @@ def get_db_connection():
         )
 
 def init_db():
-    """初始化数据库表（包含 reset_token 字段）"""
     conn = get_db_connection()
     cur = conn.cursor()
     
-    # 用户表（增加 reset_token 和 reset_token_expiry）
     cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
             email TEXT PRIMARY KEY,
@@ -53,7 +50,6 @@ def init_db():
         )
     ''')
     
-    # 记录表
     cur.execute('''
         CREATE TABLE IF NOT EXISTS records (
             id SERIAL PRIMARY KEY,
@@ -250,14 +246,12 @@ def forgot_password():
             flash('😿 该邮箱未注册', 'danger')
             return render_template('forgot_password.html')
         
-        # 生成 token
         token = str(uuid.uuid4())
-        expiry = str(datetime.now().timestamp() + 900)  # 15分钟
+        expiry = str(datetime.now().timestamp() + 900)
         
         update_user_token(email, token, expiry)
         
-        # 发送邮件
-        reset_link = f"https://cat-book-xxx.onrender.com/reset_password?token={token}"  # 替换为你的域名
+        reset_link = f"https://你的域名.onrender.com/reset_password?token={token}"  # 改成你的域名
         msg = Message('🐱 重置你的小鱼干记账本密码',
                       recipients=[email])
         msg.body = f'''你好 {user['username']}，
@@ -284,7 +278,6 @@ def reset_password():
         flash('😿 无效的链接', 'danger')
         return redirect(url_for('login'))
     
-    # 验证 token
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute('SELECT * FROM users WHERE reset_token = %s', (token,))
@@ -296,7 +289,6 @@ def reset_password():
         flash('😿 无效的链接', 'danger')
         return redirect(url_for('login'))
     
-    # 检查是否过期
     now = datetime.now().timestamp()
     if float(user['reset_token_expiry']) < now:
         flash('😿 链接已过期，请重新申请', 'danger')
