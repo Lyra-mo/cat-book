@@ -424,6 +424,53 @@ def api_get_monthly_stats():
         'balance': income - expense,
         'categories': categories
     })
+    # ===== 导出 Excel =====
+@app.route('/api/export_excel', methods=['GET'])
+@login_required
+def export_excel():
+    import io
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    
+    records = get_records(current_user.email)
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "记账本"
+    
+    # 表头
+    headers = ['日期', '类别', '金额', '备注', '类型']
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="FF8A80", end_color="FF8A80", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center")
+    
+    # 数据
+    for row_idx, r in enumerate(records, 2):
+        ws.cell(row=row_idx, column=1, value=r['date'])
+        ws.cell(row=row_idx, column=2, value=r['category'])
+        ws.cell(row=row_idx, column=3, value=r['amount'])
+        ws.cell(row=row_idx, column=4, value=r['note'] or '')
+        ws.cell(row=row_idx, column=5, value=r['type'])
+    
+    # 调整列宽
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 12
+    ws.column_dimensions['C'].width = 10
+    ws.column_dimensions['D'].width = 20
+    ws.column_dimensions['E'].width = 8
+    
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'小鱼干记账_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    )
 
 # ===== 启动 =====
 
