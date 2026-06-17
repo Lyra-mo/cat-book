@@ -515,3 +515,10 @@ def export_excel():
 if __name__ == '__main__':
     init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)
+    @app.route('/test_email')
+def test_email():
+    success = send_email('fipped99@qq.com', '🐱 测试邮件', '这是一封测试邮件，如果你收到了，说明邮件功能正常！')
+    if success:
+        return '✅ 邮件发送成功！请检查邮箱（包括垃圾箱）'
+    else:
+        return '❌ 邮件发送失败，请查看 Render 日志'
