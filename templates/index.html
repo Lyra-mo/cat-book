@@ -17,9 +17,7 @@
         body {
             font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', 'Microsoft YaHei', cursive;
             body {
-    background-image: url('/bg_pattern.png');
-    /* 其他不变 */
-}
+    background-image: url('{{ url_for('static', filename='bg_pattern.png') }}');
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
