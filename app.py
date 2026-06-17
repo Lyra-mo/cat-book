@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from flask_mail import Mail, Message
 from datetime import datetime
 import json
 import os
@@ -9,18 +8,35 @@ import re
 import uuid
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import requests
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey123456'
 
-# ===== 邮件配置（已配置好） =====
-app.config['MAIL_SERVER'] = 'smtp.qq.com'
-app.config['MAIL_PORT'] = 465
-app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USERNAME'] = 'fipped99@qq.com'
-app.config['MAIL_PASSWORD'] = 'qlppaqhjzoyzeaig'
-app.config['MAIL_DEFAULT_SENDER'] = 'fipped99@qq.com'
-mail = Mail(app)
+# ===== Brevo 邮件配置（已配置好） =====
+BREVO_API_KEY = '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'
+
+def send_email(to_email, subject, body):
+    """通过 Brevo API 发送邮件"""
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json",
+    }
+    data = {
+        "sender": {"name": "小鱼干记账本", "email": "1220518@outlook.com"},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": body.replace('\n', '<br>')
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        return response.status_code == 201
+    except Exception as e:
+        print(f"邮件发送失败: {e}")
+        return False
 
 # ===== 数据库连接 =====
 def get_db_connection():
@@ -62,6 +78,14 @@ def init_db():
         cur.execute('ALTER TABLE users ADD COLUMN reset_token_expiry TEXT')
         print("✅ 已添加 reset_token_expiry 字段")
     
+    if 'security_question' not in columns:
+        cur.execute('ALTER TABLE users ADD COLUMN security_question TEXT')
+        print("✅ 已添加 security_question 字段")
+    
+    if 'security_answer' not in columns:
+        cur.execute('ALTER TABLE users ADD COLUMN security_answer TEXT')
+        print("✅ 已添加 security_answer 字段")
+    
     # 创建记录表
     cur.execute('''
         CREATE TABLE IF NOT EXISTS records (
@@ -92,12 +116,12 @@ def get_user(email):
     conn.close()
     return user
 
-def save_user(email, username, hashed_password, created_at):
+def save_user(email, username, hashed_password, created_at, security_question=None, security_answer=None):
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        'INSERT INTO users (email, username, password, created_at) VALUES (%s, %s, %s, %s)',
-        (email, username, hashed_password, created_at)
+        'INSERT INTO users (email, username, password, created_at, security_question, security_answer) VALUES (%s, %s, %s, %s, %s, %s)',
+        (email, username, hashed_password, created_at, security_question, security_answer)
     )
     conn.commit()
     cur.close()
@@ -208,6 +232,8 @@ def register():
         username = request.form.get('username')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
+        security_question = request.form.get('security_question')
+        security_answer = request.form.get('security_answer')
         
         if not is_valid_email(email):
             flash('😿 邮箱格式不正确', 'danger')
@@ -228,7 +254,7 @@ def register():
         
         hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        save_user(email, username, hashed.decode('utf-8'), created_at)
+        save_user(email, username, hashed.decode('utf-8'), created_at, security_question, security_answer)
         
         flash('🎀 注册成功！请登录', 'success')
         return redirect(url_for('login'))
@@ -264,22 +290,23 @@ def forgot_password():
         
         update_user_token(email, token, expiry)
         
-        reset_link = f"https://cat-book-62zc.onrender.com/reset_password?token={token}"
-        msg = Message('🐱 重置你的小鱼干记账本密码',
-                      recipients=[email])
-        msg.body = f'''你好 {user['username']}，
+        body = f'''你好 {user['username']}，
 
 你请求了重置密码。请点击以下链接（15分钟内有效）：
 
-{reset_link}
+https://cat-book-62zc.onrender.com/reset_password?token={token}
 
 如果这不是你本人的操作，请忽略此邮件。
 
 🐱 小鱼干记账本
 '''
-        mail.send(msg)
         
-        flash('📧 重置邮件已发送，请查收（15分钟有效）', 'success')
+        success = send_email(email, '🐱 重置你的小鱼干记账本密码', body)
+        if success:
+            flash('📧 重置邮件已发送，请查收（15分钟有效）', 'success')
+        else:
+            flash('😿 邮件发送失败，请稍后重试', 'danger')
+        
         return redirect(url_for('login'))
     
     return render_template('forgot_password.html')
