@@ -13,13 +13,13 @@ from psycopg2.extras import RealDictCursor
 app = Flask(__name__)
 app.secret_key = 'supersecretkey123456'
 
-# ===== 邮件配置（已填入你的授权码） =====
+# ===== 邮件配置（已配置好） =====
 app.config['MAIL_SERVER'] = 'smtp.qq.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USERNAME'] = '你的QQ邮箱@qq.com'   # 改成你的QQ邮箱
-app.config['MAIL_PASSWORD'] = 'ehbumojixycbdjie'   # ✅ 已填入你的授权码
-app.config['MAIL_DEFAULT_SENDER'] = '你的QQ邮箱@qq.com'  # 改成你的QQ邮箱
+app.config['MAIL_USERNAME'] = 'fipped99@qq.com'
+app.config['MAIL_PASSWORD'] = 'ehbumojixycbdjie'
+app.config['MAIL_DEFAULT_SENDER'] = 'fipped99@qq.com'
 mail = Mail(app)
 
 # ===== 数据库连接 =====
@@ -36,20 +36,33 @@ def get_db_connection():
         )
 
 def init_db():
+    """初始化数据库表，自动添加缺失字段"""
     conn = get_db_connection()
     cur = conn.cursor()
     
+    # 创建用户表（基础表）
     cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
             email TEXT PRIMARY KEY,
             username TEXT NOT NULL,
             password TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            reset_token TEXT,
-            reset_token_expiry TEXT
+            created_at TEXT NOT NULL
         )
     ''')
     
+    # ===== 检查并添加 reset_token 字段 =====
+    cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users'")
+    columns = [row[0] for row in cur.fetchall()]
+    
+    if 'reset_token' not in columns:
+        cur.execute('ALTER TABLE users ADD COLUMN reset_token TEXT')
+        print("✅ 已添加 reset_token 字段")
+    
+    if 'reset_token_expiry' not in columns:
+        cur.execute('ALTER TABLE users ADD COLUMN reset_token_expiry TEXT')
+        print("✅ 已添加 reset_token_expiry 字段")
+    
+    # 创建记录表
     cur.execute('''
         CREATE TABLE IF NOT EXISTS records (
             id SERIAL PRIMARY KEY,
@@ -67,7 +80,7 @@ def init_db():
     conn.commit()
     cur.close()
     conn.close()
-    print("✅ 数据库表创建成功！")
+    print("✅ 数据库初始化完成！")
 
 # ===== 用户操作 =====
 def get_user(email):
@@ -161,7 +174,7 @@ def load_user(email):
         return User(email)
     return None
 
-# ===== 静态文件路由（确保背景图能被访问） =====
+# ===== 静态文件路由 =====
 @app.route('/bg_pattern.png')
 def serve_bg():
     return send_file('bg_pattern.png', mimetype='image/png')
@@ -247,11 +260,11 @@ def forgot_password():
             return render_template('forgot_password.html')
         
         token = str(uuid.uuid4())
-        expiry = str(datetime.now().timestamp() + 900)
+        expiry = str(datetime.now().timestamp() + 900)  # 15分钟
         
         update_user_token(email, token, expiry)
         
-        reset_link = f"https://你的域名.onrender.com/reset_password?token={token}"  # 改成你的域名
+        reset_link = f"https://cat-book-62zc.onrender.com/reset_password?token={token}"
         msg = Message('🐱 重置你的小鱼干记账本密码',
                       recipients=[email])
         msg.body = f'''你好 {user['username']}，
@@ -424,7 +437,8 @@ def api_get_monthly_stats():
         'balance': income - expense,
         'categories': categories
     })
-    # ===== 导出 Excel =====
+
+# ===== 导出 Excel =====
 @app.route('/api/export_excel', methods=['GET'])
 @login_required
 def export_excel():
@@ -438,7 +452,6 @@ def export_excel():
     ws = wb.active
     ws.title = "记账本"
     
-    # 表头
     headers = ['日期', '类别', '金额', '备注', '类型']
     for col, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col, value=header)
@@ -446,7 +459,6 @@ def export_excel():
         cell.fill = PatternFill(start_color="FF8A80", end_color="FF8A80", fill_type="solid")
         cell.alignment = Alignment(horizontal="center")
     
-    # 数据
     for row_idx, r in enumerate(records, 2):
         ws.cell(row=row_idx, column=1, value=r['date'])
         ws.cell(row=row_idx, column=2, value=r['category'])
@@ -454,7 +466,6 @@ def export_excel():
         ws.cell(row=row_idx, column=4, value=r['note'] or '')
         ws.cell(row=row_idx, column=5, value=r['type'])
     
-    # 调整列宽
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 12
     ws.column_dimensions['C'].width = 10
