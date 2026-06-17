@@ -11,89 +11,129 @@
             box-sizing: border-box;
         }
         body {
-            font-family: 'Microsoft YaHei', sans-serif;
+            font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', 'Microsoft YaHei', cursive;
             background: #FFF5ED;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            background-image: url('/static/bg_pattern.png?ver=20260617');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
         }
-        .login-box {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
+        .box {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 28px;
+            padding: 40px 36px;
             width: 380px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            box-shadow: 0 8px 32px rgba(255, 138, 128, 0.12);
             text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.4);
         }
-        .login-box h1 {
+        .box h1 {
             font-size: 28px;
             color: #FF8A80;
             margin-bottom: 5px;
         }
-        .login-box p {
+        .box .subtitle {
             color: #8D6E63;
-            margin-bottom: 25px;
             font-size: 14px;
+            margin-bottom: 25px;
         }
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 16px;
             text-align: left;
         }
         .form-group label {
             display: block;
-            font-size: 13px;
+            font-size: 14px;
             color: #5D4037;
             margin-bottom: 4px;
         }
-        .form-group input {
+        .form-group input,
+        .form-group select {
             width: 100%;
             padding: 10px 14px;
-            border: 1px solid #E8DDD5;
-            border-radius: 10px;
-            font-size: 14px;
-            background: #FFF8F0;
+            border: 2px solid #E8DDD5;
+            border-radius: 16px;
+            font-size: 15px;
+            background: rgba(255, 248, 240, 0.6);
+            font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', cursive;
+            transition: border 0.2s, box-shadow 0.2s;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #FF8A80;
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(255, 138, 128, 0.08);
         }
         .btn {
             width: 100%;
             padding: 12px;
             border: none;
-            border-radius: 10px;
-            font-size: 16px;
+            border-radius: 50px;
+            font-size: 17px;
+            font-family: 'ZCOOL KuaiLe', 'Comic Sans MS', cursive;
             cursor: pointer;
             background: #B5EAD7;
             color: #2D6A4F;
             font-weight: bold;
+            transition: 0.25s;
+            box-shadow: 0 4px 12px rgba(181, 234, 215, 0.2);
         }
         .btn:hover {
             background: #8DD4BA;
+            transform: translateY(-2px);
         }
-        .login-link {
-            margin-top: 15px;
-            font-size: 13px;
+        .link {
+            margin-top: 16px;
+            font-size: 14px;
             color: #8D6E63;
         }
-        .login-link a {
+        .link a {
             color: #FF8A80;
             text-decoration: none;
             font-weight: bold;
         }
         .flash {
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 15px;
+            padding: 10px 14px;
+            border-radius: 14px;
+            margin-bottom: 16px;
             font-size: 14px;
+            text-align: center;
         }
-        .flash-success { background: #B5EAD7; color: #2D6A4F; }
-        .flash-danger { background: #FFB5B5; color: #8D3B3B; }
-        .flash-warning { background: #FFE5A3; color: #8D6E00; }
-        .flash-info { background: #A8D8EA; color: #1A4A5A; }
+        .flash-success {
+            background: #B5EAD7;
+            color: #2D6A4F;
+        }
+        .flash-danger {
+            background: #FFB5B5;
+            color: #8D3B3B;
+        }
+        .flash-warning {
+            background: #FFE5A3;
+            color: #8D6E00;
+        }
+        .flash-info {
+            background: #A8D8EA;
+            color: #1A4A5A;
+        }
+        @media (max-width: 480px) {
+            .box {
+                padding: 30px 20px;
+                width: 92%;
+                margin: 0 10px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="login-box">
+    <div class="box">
         <h1>🐱 注册账号</h1>
-        <p>🌸 加入小鱼干记账本</p>
+        <div class="subtitle">🌸 加入小鱼干记账本</div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, message in messages %}
@@ -118,10 +158,28 @@
                 <label>🔒 确认密码</label>
                 <input type="password" name="confirm_password" placeholder="再次输入密码" required>
             </div>
+
+            <!-- ===== 安全问题（用于找回密码） ===== -->
+            <div class="form-group">
+                <label>🛡️ 安全问题（用于找回密码）</label>
+                <select name="security_question" required>
+                    <option value="你的小学名称是什么？">你的小学名称是什么？</option>
+                    <option value="你的宠物名字是什么？">你的宠物名字是什么？</option>
+                    <option value="你的出生城市是哪里？">你的出生城市是哪里？</option>
+                    <option value="你最喜欢的颜色是什么？">你最喜欢的颜色是什么？</option>
+                    <option value="你的第一任班主任叫什么？">你的第一任班主任叫什么？</option>
+                    <option value="你妈妈的生日是哪天？">你妈妈的生日是哪天？</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>🔑 安全答案</label>
+                <input type="text" name="security_answer" placeholder="请输入答案（请牢记！）" required>
+            </div>
+
             <button type="submit" class="btn">🎀 注册</button>
         </form>
 
-        <div class="login-link">
+        <div class="link">
             已有账号？ <a href="/login">去登录</a>
         </div>
     </div>
