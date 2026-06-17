@@ -230,7 +230,7 @@
             font-weight: 700;
         }
 
-        /* ===== 预算进度条 ===== */
+        /* ===== 预算模块 ===== */
         .budget-section {
             margin-top: 12px;
             padding-top: 12px;
@@ -239,9 +239,31 @@
         .budget-row {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-size: 13px;
             color: #5D4037;
             margin-bottom: 6px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .budget-row .budget-input-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .budget-row .budget-input-group input {
+            width: 90px;
+            padding: 4px 10px;
+            border: 2px solid #E8DDD5;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: inherit;
+            background: rgba(255, 248, 240, 0.6);
+            transition: border 0.2s;
+        }
+        .budget-row .budget-input-group input:focus {
+            border-color: #FF8A80;
+            outline: none;
         }
         .budget-bar {
             width: 100%;
@@ -261,6 +283,16 @@
         }
         .budget-bar .fill.danger {
             background: linear-gradient(90deg, #FF8A80, #FF6B6B);
+        }
+        .budget-message {
+            text-align: center;
+            font-size: 12px;
+            color: #8D6E63;
+            margin-top: 6px;
+        }
+        .budget-used {
+            font-size: 12px;
+            color: #8D6E63;
         }
 
         /* ===== 表单两行布局 ===== */
@@ -522,6 +554,14 @@
             .chart-container {
                 height: 180px;
             }
+            .budget-row {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            .budget-row .budget-input-group {
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -575,12 +615,20 @@
         <div class="budget-section" id="budgetSection">
             <div class="budget-row">
                 <span>📋 本月预算</span>
-                <span id="budgetText">¥0 / ¥0</span>
+                <div class="budget-input-group">
+                    <span style="font-size:13px;color:#8D6E63;">¥</span>
+                    <input type="number" id="budgetInput" value="2000" min="0" step="100">
+                    <button class="btn btn-primary btn-sm" onclick="saveBudget()">💾 保存</button>
+                </div>
+            </div>
+            <div class="budget-row">
+                <span class="budget-used" id="budgetUsedText">已用 ¥0</span>
+                <span class="budget-used" id="budgetRemainText">剩余 ¥2000</span>
             </div>
             <div class="budget-bar">
                 <div class="fill" id="budgetFill" style="width:0%"></div>
             </div>
-            <div style="text-align:center;font-size:12px;color:#8D6E63;margin-top:6px;" id="budgetMessage">
+            <div class="budget-message" id="budgetMessage">
                 💡 设置预算，更好管理支出
             </div>
         </div>
@@ -637,7 +685,7 @@
         let currentStats = 'monthly';
         let pieChartInstance = null;
         let currentType = '支出';
-        let budgetAmount = 2000; // 默认预算，可让用户自定义
+        let budgetAmount = 2000;
 
         document.getElementById('date').value = new Date().toISOString().split('T')[0];
 
@@ -672,33 +720,47 @@
             loadStats();
         }
 
-        // ===== 加载统计 =====
+        // ===== 加载统计（修复周度数据） =====
         function loadStats() {
             const url = currentStats === 'monthly' ? '/api/monthly_stats' : '/api/weekly_stats';
             fetch(url)
                 .then(res => res.json())
                 .then(data => {
-                    const categories = data.categories || {};
-                    const totalExpense = Object.values(categories).reduce((a, b) => a + b, 0);
-                    const totalIncome = data.income || 0;
-                    const balance = totalIncome - totalExpense;
+                    let categories = data.categories || {};
+                    let totalExpense = 0;
+                    let totalIncome = data.income || 0;
 
-                    // 收入
-                    document.getElementById('income').textContent = totalIncome > 0 ? '¥' + totalIncome.toFixed(0) :
-                    '暂无收入';
-                    document.getElementById('expense').textContent = '¥' + totalExpense.toFixed(0);
-                    document.getElementById('balance').textContent = '¥' + balance.toFixed(0);
-
-                    // 结余提示
-                    const balanceEl = document.getElementById('balance');
-                    if (balance < 0) {
-                        balanceEl.style.color = '#FF6B6B';
-                        showToast('😿 本月超支 ' + Math.abs(balance).toFixed(0) + ' 元，看看开销占比吧');
-                    } else if (balance > 0) {
-                        balanceEl.style.color = '#4ECDC4';
-                        // 不频繁弹toast，只在加载时显示一次
+                    // 修复周度数据：从 records 里计算
+                    if (currentStats === 'weekly' && data.records) {
+                        const catMap = {};
+                        data.records.forEach(r => {
+                            if (r.type === '支出') {
+                                catMap[r.category] = (catMap[r.category] || 0) + r.amount;
+                            }
+                            if (r.type === '收入') {
+                                totalIncome += r.amount;
+                            }
+                        });
+                        categories = catMap;
+                        totalExpense = Object.values(catMap).reduce((a, b) => a + b, 0);
+                    } else {
+                        totalExpense = Object.values(categories).reduce((a, b) => a + b, 0);
                     }
 
+                    // 更新显示
+                    document.getElementById('income').textContent = totalIncome > 0 ? '¥' + totalIncome.toFixed(0) : '暂无收入';
+                    document.getElementById('expense').textContent = '¥' + totalExpense.toFixed(0);
+                    document.getElementById('balance').textContent = '¥' + (totalIncome - totalExpense).toFixed(0);
+
+                    // 结余提示
+                    const balance = totalIncome - totalExpense;
+                    if (balance < 0) {
+                        document.getElementById('balance').style.color = '#FF6B6B';
+                    } else {
+                        document.getElementById('balance').style.color = '#4ECDC4';
+                    }
+
+                    // 统计信息
                     const info = document.getElementById('statsInfo');
                     if (currentStats === 'monthly') {
                         info.textContent = `📆 ${data.year}年${data.month}月 统计`;
@@ -726,32 +788,8 @@
                     updatePieChart(categories, totalExpense);
 
                     // 更新预算
-                    updateBudget(totalExpense);
+                    updateBudgetDisplay();
                 });
-        }
-
-        // ===== 更新预算 =====
-        function updateBudget(totalExpense) {
-            const budget = budgetAmount;
-            const percent = Math.min((totalExpense / budget) * 100, 100);
-            document.getElementById('budgetText').textContent = `¥${totalExpense.toFixed(0)} / ¥${budget}`;
-            const fill = document.getElementById('budgetFill');
-            fill.style.width = percent + '%';
-            fill.className = 'fill';
-            if (percent > 90) fill.classList.add('danger');
-            else if (percent > 70) fill.classList.add('warning');
-
-            const msg = document.getElementById('budgetMessage');
-            if (totalExpense > budget) {
-                msg.textContent = '⚠️ 已超出本月预算，注意控制开销';
-                msg.style.color = '#FF6B6B';
-            } else if (totalExpense > budget * 0.7) {
-                msg.textContent = '📌 预算已使用 ' + percent.toFixed(0) + '%，注意余量';
-                msg.style.color = '#FFB74D';
-            } else {
-                msg.textContent = '✅ 预算余量充足，继续保持';
-                msg.style.color = '#4ECDC4';
-            }
         }
 
         // ===== 饼图 =====
@@ -940,10 +978,59 @@
                 });
         }
 
-        // ===== 导出 Excel（调用后端接口） =====
+        // ===== 导出 Excel =====
         function exportExcel() {
             showToast('📤 正在生成导出文件...');
             window.location.href = '/api/export_excel';
+        }
+
+        // ===== 预算相关 =====
+        function loadBudget() {
+            const saved = localStorage.getItem('catbook_budget');
+            if (saved) {
+                budgetAmount = parseFloat(saved);
+                document.getElementById('budgetInput').value = budgetAmount;
+            }
+            updateBudgetDisplay();
+        }
+
+        function saveBudget() {
+            const val = parseFloat(document.getElementById('budgetInput').value);
+            if (!val || val <= 0) {
+                showToast('😿 请输入有效的预算金额');
+                return;
+            }
+            budgetAmount = val;
+            localStorage.setItem('catbook_budget', String(val));
+            showToast('🎀 预算已更新为 ¥' + val.toFixed(0));
+            updateBudgetDisplay();
+        }
+
+        function updateBudgetDisplay() {
+            const expenseText = document.getElementById('expense').textContent;
+            const expense = parseFloat(expenseText.replace('¥', '')) || 0;
+
+            const percent = Math.min((expense / budgetAmount) * 100, 100);
+            document.getElementById('budgetUsedText').textContent = '已用 ¥' + expense.toFixed(0);
+            document.getElementById('budgetRemainText').textContent = '剩余 ¥' + Math.max(budgetAmount - expense, 0).toFixed(0);
+
+            const fill = document.getElementById('budgetFill');
+            fill.style.width = percent + '%';
+            fill.className = 'fill';
+            if (percent > 90) fill.classList.add('danger');
+            else if (percent > 70) fill.classList.add('warning');
+
+            const msg = document.getElementById('budgetMessage');
+            if (expense > budgetAmount) {
+                msg.textContent = '⚠️ 已超出本月预算，注意控制开销';
+                msg.style.color = '#FF6B6B';
+            } else if (expense > budgetAmount * 0.7) {
+                msg.textContent = '📌 预算已使用 ' + percent.toFixed(0) + '%，注意余量';
+                msg.style.color = '#FFB74D';
+            } else {
+                msg.textContent = '✅ 预算余量充足，继续保持';
+                msg.style.color = '#4ECDC4';
+            }
         }
 
         // ===== 窗口自适应 =====
@@ -953,6 +1040,7 @@
 
         // ===== 加载数据 =====
         loadRecords();
+        loadBudget();
     </script>
 </body>
 </html>
