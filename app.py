@@ -12,10 +12,10 @@ import requests
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey123456'
+
 # ===== 网易邮箱邮件配置 =====
-# 你的网易邮箱信息
-NETEASE_EMAIL = "18024679346@163.com"  # 
-NETEASE_AUTH_CODE = "CNTzzMEFunsYhD8w"    # 
+NETEASE_EMAIL = "18024679346@163.com"
+NETEASE_AUTH_CODE = "CNTzzMEFunsYhD8w"
 
 def send_email(to_email, subject, body):
     """通过网易邮箱 SMTP 发送邮件"""
@@ -44,7 +44,7 @@ def send_email(to_email, subject, body):
     except Exception as e:
         app.logger.error(f"[网易] 发送失败：{str(e)}")
         return False
-        
+
 # ===== 数据库连接 =====
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
@@ -212,44 +212,26 @@ def serve_bg():
 
 # ===== 路由 =====
 
-@app.route('/forgot_password', methods=['GET', 'POST'])
-def forgot_password():
+@app.route('/login', methods=['GET', 'POST'])
+def login():
     if request.method == 'POST':
         email = request.form.get('email')
+        password = request.form.get('password')
+        
         user = get_user(email)
-        
-        if not user:
-            flash('😿 该邮箱未注册', 'danger')
-            return render_template('forgot_password.html')
-        
-        token = str(uuid.uuid4())
-        expiry = str(datetime.now().timestamp() + 900)
-        update_user_token(email, token, expiry)
-        
-        reset_link = f"https://cat-book-62zc.onrender.com/reset_password?token={token}"
-        body = f"""你好 {user['username']}，
-
-你请求了重置密码。请点击以下链接（15分钟内有效）：
-
-{reset_link}
-
-如果这不是你本人的操作，请忽略此邮件。
-
-🐱 小鱼干记账本
-"""
-        
-        app.logger.info(f"🔍 准备发送邮件到 {email}")   # ← 新增
-        success = send_email(email, '🐱 重置你的小鱼干记账本密码', body)
-        app.logger.info(f"🔍 发送结果：{success}")      # ← 新增
-        
-        if success:
-            flash('📧 重置邮件已发送，请查收（15分钟有效）', 'success')
+        if user:
+            stored_password = user['password']
+            if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+                login_user(User(email))
+                flash(f'🐱 欢迎回来，{user["username"]}！', 'success')
+                return redirect(url_for('index'))
+            else:
+                flash('😿 密码错误，再试一次吧', 'danger')
         else:
-            flash('😿 邮件发送失败，请稍后重试', 'danger')
-        
-        return redirect(url_for('login'))
+            flash('😿 该邮箱未注册，请先注册', 'warning')
     
-    return render_template('forgot_password.html')
+    return render_template('login.html')
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -300,7 +282,7 @@ def index():
     username = user['username'] if user else '用户'
     return render_template('index.html', username=username, email=current_user.email)
 
-# ===== 忘记密码（邮件方式 + 安全问题备用） =====
+# ===== 忘记密码（唯一路由） =====
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
@@ -311,9 +293,8 @@ def forgot_password():
             flash('😿 该邮箱未注册', 'danger')
             return render_template('forgot_password.html')
         
-        # 方式一：优先发邮件重置
         token = str(uuid.uuid4())
-        expiry = str(datetime.now().timestamp() + 900)  # 15分钟有效期
+        expiry = str(datetime.now().timestamp() + 900)
         update_user_token(email, token, expiry)
         
         reset_link = f"https://cat-book-62zc.onrender.com/reset_password?token={token}"
@@ -328,16 +309,14 @@ def forgot_password():
 🐱 小鱼干记账本
 """
         
+        app.logger.info(f"🔍 准备发送邮件到 {email}")
         success = send_email(email, '🐱 重置你的小鱼干记账本密码', body)
+        app.logger.info(f"🔍 发送结果：{success}")
+        
         if success:
             flash('📧 重置邮件已发送，请查收（15分钟有效）', 'success')
         else:
-            # 方式二：邮件失败时，走安全问题备用通道
-            if user.get('security_question'):
-                flash('😿 邮件发送失败，请通过安全问题验证身份', 'warning')
-                return render_template('forgot_password_security.html', email=email, question=user['security_question'])
-            else:
-                flash('😿 邮件发送失败，且该用户未设置安全问题，请联系管理员', 'danger')
+            flash('😿 邮件发送失败，请稍后重试', 'danger')
         
         return redirect(url_for('login'))
     
