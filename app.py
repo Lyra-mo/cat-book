@@ -12,37 +12,40 @@ import requests
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey123456'
-
-# ===== Brevo 邮件配置（唯一发信渠道） =====
-BREVO_API_KEY = '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'
-BREVO_SENDER_EMAIL = "1220518@outlook.com"
-BREVO_SENDER_NAME = "小鱼干记账本"
+# ===== 网易邮箱邮件配置 =====
+# 你的网易邮箱信息
+NETEASE_EMAIL = "18024679346@163.com"  # 
+NETEASE_AUTH_CODE = "CNTzzMEFunsYhD8w"    # 
 
 def send_email(to_email, subject, body):
-    """通过 Brevo API 发送邮件"""
-    url = "https://api.brevo.com/v3/smtp/email"
-    headers = {
-        "accept": "application/json",
-        "api-key": BREVO_API_KEY,
-        "content-type": "application/json",
-    }
-    data = {
-        "sender": {"name": BREVO_SENDER_NAME, "email": BREVO_SENDER_EMAIL},
-        "to": [{"email": to_email}],
-        "subject": subject,
-        "htmlContent": body.replace('\n', '<br>')
-    }
-    
+    """通过网易邮箱 SMTP 发送邮件"""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
     try:
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 201:
-            print(f"[Brevo] 邮件发送成功 → {to_email}")
-            return True
-        else:
-            print(f"[Brevo] 发送失败，状态码 {response.status_code}: {response.text}")
-            return False
+        # 网易 SMTP 服务器配置
+        smtp_server = "smtp.163.com"
+        smtp_port = 465  # SSL 端口
+
+        # 构建邮件
+        msg = MIMEMultipart()
+        msg["From"] = f"小鱼干记账本 <{NETEASE_EMAIL}>"
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        # 邮件正文（支持HTML）
+        html_content = body.replace('\n', '<br>')
+        msg.attach(MIMEText(html_content, "html", "utf-8"))
+
+        # 发送邮件（使用SSL）
+        server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        server.login(NETEASE_EMAIL, NETEASE_AUTH_CODE)  # 登录名是完整邮箱，密码是授权码
+        server.sendmail(NETEASE_EMAIL, to_email, msg.as_string())
+        server.quit()
+        print(f"[网易] 邮件发送成功 → {to_email}")
+        return True
     except Exception as e:
-        print(f"[Brevo] 发送异常: {e}")
+        print(f"[网易] 发送失败：{str(e)}")
         return False
 
 # ===== 数据库连接 =====
