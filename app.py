@@ -424,7 +424,7 @@ def api_add_record():
     amount = float(data.get('amount', 0))
     note = data.get('note', '')
     type_ = data.get('type', '支出')
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S')
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     add_record(current_user.email, date, category, amount, note, type_, created_at)
     return jsonify({'success': True})
