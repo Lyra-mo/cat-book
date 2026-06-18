@@ -44,7 +44,6 @@ def send_email(to_email, subject, body):
     except Exception as e:
         app.logger.error(f"[网易] 发送失败：{str(e)}")
         return False
-
 # ===== 数据库连接 =====
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
