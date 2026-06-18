@@ -24,28 +24,25 @@ def send_email(to_email, subject, body):
     from email.mime.multipart import MIMEMultipart
 
     try:
-        # 网易 SMTP 服务器配置
         smtp_server = "smtp.163.com"
-        smtp_port = 465  # SSL 端口
+        smtp_port = 465
 
-        # 构建邮件
         msg = MIMEMultipart()
         msg["From"] = f"小鱼干记账本 <{NETEASE_EMAIL}>"
         msg["To"] = to_email
         msg["Subject"] = subject
-        # 邮件正文（支持HTML）
         html_content = body.replace('\n', '<br>')
         msg.attach(MIMEText(html_content, "html", "utf-8"))
 
-        # 发送邮件（使用SSL）
         server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-        server.login(NETEASE_EMAIL, NETEASE_AUTH_CODE)  # 登录名是完整邮箱，密码是授权码
+        server.login(NETEASE_EMAIL, NETEASE_AUTH_CODE)
         server.sendmail(NETEASE_EMAIL, to_email, msg.as_string())
         server.quit()
-        print(f"[网易] 邮件发送成功 → {to_email}")
+        
+        app.logger.info(f"[网易] 邮件发送成功 → {to_email}")
         return True
     except Exception as e:
-        print(f"[网易] 发送失败：{str(e)}")
+        app.logger.error(f"[网易] 发送失败：{str(e)}")
         return False
 
 # ===== 数据库连接 =====
