@@ -98,7 +98,6 @@ def get_db_connection():
             user='catbook_user',
             password=''
         )
-
 def init_db():
     """初始化数据库表，自动添加缺失字段"""
     conn = get_db_connection()
@@ -132,7 +131,7 @@ def init_db():
     
     if 'security_answer' not in columns:
         cur.execute('ALTER TABLE users ADD COLUMN security_answer TEXT')
-        print("✅ 已添加 security_answer 字段')
+        print("✅ 已添加 security_answer 字段")
     
     # 创建记录表
     cur.execute('''
