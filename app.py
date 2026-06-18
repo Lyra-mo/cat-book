@@ -9,49 +9,17 @@ import uuid
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import requests
-# Outlook SMTP邮件依赖
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey123456'
 
-# ===================== 邮件配置区（已填好你的Outlook信息） =====================
-# 1. Brevo API配置（原有备用渠道）
+# ===== Brevo 邮件配置（唯一发信渠道） =====
 BREVO_API_KEY = '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'
+BREVO_SENDER_EMAIL = "1220518@outlook.com"
+BREVO_SENDER_NAME = "小鱼干记账本"
 
-# 2. Outlook SMTP配置（核心发信渠道）
-OUTLOOK_SENDER_EMAIL = "1220518@outlook.com"
-OUTLOOK_APP_PASSWORD = "prfqfvovakcupqes"
-OUTLOOK_SMTP_SERVER = "smtp-mail.outlook.com"
-OUTLOOK_SMTP_PORT = 587
-# ======================================================================
-
-# ===== 新增：Outlook SMTP发信函数 =====
-def send_email_by_outlook(to_email, subject, body):
-    """使用Outlook SMTP + 应用密码发送HTML邮件"""
-    try:
-        msg = MIMEMultipart()
-        msg["From"] = f"小鱼干记账本 <{OUTLOOK_SENDER_EMAIL}>"
-        msg["To"] = to_email
-        msg["Subject"] = subject
-        html_content = body.replace('\n', '<br>')
-        msg.attach(MIMEText(html_content, "html", "utf-8"))
-
-        server = smtplib.SMTP(OUTLOOK_SMTP_SERVER, OUTLOOK_SMTP_PORT)
-        server.starttls()
-        server.login(OUTLOOK_SENDER_EMAIL, OUTLOOK_APP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"[Outlook] 邮件发送成功 → {to_email}")
-        return True
-    except Exception as e:
-        print(f"[Outlook] 发送失败：{str(e)}")
-        return False
-
-# ===== Brevo备用发信函数 =====
-def send_email_by_brevo(to_email, subject, body):
+def send_email(to_email, subject, body):
+    """通过 Brevo API 发送邮件"""
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
         "accept": "application/json",
@@ -59,32 +27,23 @@ def send_email_by_brevo(to_email, subject, body):
         "content-type": "application/json",
     }
     data = {
-        "sender": {"name": "小鱼干记账本", "email": OUTLOOK_SENDER_EMAIL},
+        "sender": {"name": BREVO_SENDER_NAME, "email": BREVO_SENDER_EMAIL},
         "to": [{"email": to_email}],
         "subject": subject,
         "htmlContent": body.replace('\n', '<br>')
     }
+    
     try:
         response = requests.post(url, headers=headers, json=data)
         if response.status_code == 201:
             print(f"[Brevo] 邮件发送成功 → {to_email}")
             return True
         else:
-            print(f"[Brevo] 请求失败，状态码{response.status_code}：{response.text}")
+            print(f"[Brevo] 发送失败，状态码 {response.status_code}: {response.text}")
             return False
     except Exception as e:
         print(f"[Brevo] 发送异常: {e}")
         return False
-
-# ===== 统一对外调用的send_email（优先Outlook，失败自动切Brevo） =====
-def send_email(to_email, subject, body):
-    # 优先使用Outlook发信
-    outlook_ok = send_email_by_outlook(to_email, subject, body)
-    if outlook_ok:
-        return True
-    # Outlook失败再走Brevo备用通道
-    brevo_ok = send_email_by_brevo(to_email, subject, body)
-    return brevo_ok
 
 # ===== 数据库连接 =====
 def get_db_connection():
@@ -98,6 +57,7 @@ def get_db_connection():
             user='catbook_user',
             password=''
         )
+
 def init_db():
     """初始化数据库表，自动添加缺失字段"""
     conn = get_db_connection()
@@ -322,7 +282,7 @@ def index():
     username = user['username'] if user else '用户'
     return render_template('index.html', username=username, email=current_user.email)
 
-# ===== 忘记密码（安全问题方式） =====
+# ===== 忘记密码（邮件方式 + 安全问题备用） =====
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
@@ -333,28 +293,64 @@ def forgot_password():
             flash('😿 该邮箱未注册', 'danger')
             return render_template('forgot_password.html')
         
-        # 如果用户已经输入了安全答案（第二步）
-        if request.form.get('security_answer'):
-            answer = request.form.get('security_answer')
-            if user['security_answer'] and user['security_answer'] == answer:
-                # 验证通过，生成 token 跳转到重置密码
-                token = str(uuid.uuid4())
-                expiry = str(datetime.now().timestamp() + 900)
-                update_user_token(email, token, expiry)
-                flash('🎀 身份验证通过，请设置新密码', 'success')
-                return redirect(url_for('reset_password', token=token))
-            else:
-                flash('😿 安全答案错误，请重试', 'danger')
-                return render_template('forgot_password.html', question=user['security_question'], email=email)
+        # 方式一：优先发邮件重置
+        token = str(uuid.uuid4())
+        expiry = str(datetime.now().timestamp() + 900)  # 15分钟有效期
+        update_user_token(email, token, expiry)
         
-        # 第一步：显示安全问题
-        if user.get('security_question'):
-            return render_template('forgot_password.html', question=user['security_question'], email=email)
+        reset_link = f"https://cat-book-62zc.onrender.com/reset_password?token={token}"
+        body = f"""你好 {user['username']}，
+
+你请求了重置密码。请点击以下链接（15分钟内有效）：
+
+{reset_link}
+
+如果这不是你本人的操作，请忽略此邮件。
+
+🐱 小鱼干记账本
+"""
+        
+        success = send_email(email, '🐱 重置你的小鱼干记账本密码', body)
+        if success:
+            flash('📧 重置邮件已发送，请查收（15分钟有效）', 'success')
         else:
-            flash('😿 该用户未设置安全问题，请联系管理员', 'danger')
-            return render_template('forgot_password.html')
+            # 方式二：邮件失败时，走安全问题备用通道
+            if user.get('security_question'):
+                flash('😿 邮件发送失败，请通过安全问题验证身份', 'warning')
+                return render_template('forgot_password_security.html', email=email, question=user['security_question'])
+            else:
+                flash('😿 邮件发送失败，且该用户未设置安全问题，请联系管理员', 'danger')
+        
+        return redirect(url_for('login'))
     
     return render_template('forgot_password.html')
+
+# ===== 安全问题验证备用路由 =====
+@app.route('/forgot_password_security', methods=['GET', 'POST'])
+def forgot_password_security():
+    email = request.args.get('email')
+    if not email:
+        flash('😿 请先输入邮箱', 'danger')
+        return redirect(url_for('forgot_password'))
+    
+    user = get_user(email)
+    if not user:
+        flash('😿 该邮箱未注册', 'danger')
+        return redirect(url_for('forgot_password'))
+    
+    if request.method == 'POST':
+        answer = request.form.get('security_answer')
+        if user['security_answer'] and user['security_answer'] == answer:
+            token = str(uuid.uuid4())
+            expiry = str(datetime.now().timestamp() + 900)
+            update_user_token(email, token, expiry)
+            flash('🎀 身份验证通过，请设置新密码', 'success')
+            return redirect(url_for('reset_password', token=token))
+        else:
+            flash('😿 安全答案错误，请重试', 'danger')
+            return render_template('forgot_password_security.html', email=email, question=user['security_question'])
+    
+    return render_template('forgot_password_security.html', email=email, question=user['security_question'])
 
 @app.route('/reset_password', methods=['GET', 'POST'])
 def reset_password():
@@ -398,14 +394,14 @@ def reset_password():
     
     return render_template('reset_password.html', token=token)
 
-# ===== 测试邮件路由（备用） =====
+# ===== 测试邮件路由 =====
 @app.route('/test_email')
 def test_email():
-    success = send_email('fipped99@qq.com', '🐱 测试邮件', '这是一封Outlook SMTP测试邮件，如果你收到了，说明邮件功能正常！')
+    success = send_email('fipped99@qq.com', '🐱 测试邮件', '这是一封测试邮件，如果你收到了，说明邮件功能正常！')
     if success:
         return '✅ 邮件发送成功！请检查邮箱（包括垃圾箱）'
     else:
-        return '❌ 邮件发送失败，请查看控制台日志'
+        return '❌ 邮件发送失败，请查看 Render 日志'
 
 # ===== API 接口 =====
 
