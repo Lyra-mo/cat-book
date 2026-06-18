@@ -14,7 +14,7 @@ app = Flask(__name__)
 app.secret_key = 'supersecretkey123456'
 # ===== 网易邮箱邮件配置 =====
 # 你的网易邮箱信息
-NETEASE_EMAIL = "m18024679346@163.com"  # 
+NETEASE_EMAIL = "18024679346@163.com"  # 
 NETEASE_AUTH_CODE = "CNTzzMEFunsYhD8w"    # 
 
 def send_email(to_email, subject, body):
