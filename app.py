@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file, session
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from datetime import datetime, timedelta
 import json
@@ -12,6 +12,48 @@ import requests
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey123456'
+
+# ===== 🌟 新增：从请求头读取 Cookie 的钩子 =====
+@app.before_request
+def load_user_from_cookie_header():
+    """从请求头中的 Cookie 手动加载用户，解决小程序携带 Cookie 的问题"""
+    # 如果是静态资源或登录页面，跳过
+    if request.endpoint in ['static', 'serve_bg']:
+        return
+    
+    # 如果已经登录，直接返回
+    if current_user.is_authenticated:
+        return
+    
+    # 从请求头获取 Cookie
+    cookie_header = request.headers.get('Cookie')
+    if not cookie_header:
+        return
+    
+    # 解析 Cookie
+    cookies = {}
+    for item in cookie_header.split(';'):
+        item = item.strip()
+        if '=' in item:
+            key, value = item.split('=', 1)
+            cookies[key] = value
+    
+    # 如果 session 存在，尝试从 session 中恢复用户
+    if 'session' in cookies:
+        # 尝试从 session 中获取用户邮箱
+        # 这里使用 Flask 的 session 机制
+        try:
+            # 如果有 session 数据，尝试加载用户
+            from flask import session as flask_session
+            if 'user_id' in flask_session:
+                user_email = flask_session.get('user_id')
+                if user_email:
+                    user = get_user(user_email)
+                    if user:
+                        login_user(User(user_email))
+                        print(f"✅ 通过 Cookie 自动登录: {user_email}")
+        except Exception as e:
+            print(f"⚠️ Cookie 加载用户失败: {e}")
 
 # ===== 网易邮箱邮件配置 =====
 NETEASE_EMAIL = "18024679346@163.com"
@@ -210,38 +252,46 @@ def load_user(email):
 def serve_bg():
     return send_file('bg_pattern.png', mimetype='image/png')
 
-# ===== 🚀 修改1：登录路由（支持小程序JSON响应） =====
+# ===== 🌟 修改：登录路由（支持小程序） =====
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
+        
         user = get_user(email)
         
-        if user and bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
-            login_user(User(email))
-            
-            # 检测是否为小程序请求（通过 User-Agent）
-            user_agent = request.headers.get('User-Agent', '')
-            is_miniprogram = 'MicroMessenger' in user_agent
-            
-            if is_miniprogram:
-                # ⭐ 小程序登录成功：返回 JSON + 设置 Cookie
-                resp = jsonify({'success': True, 'message': '登录成功'})
-                # 显式设置 session cookie，允许跨域携带
-                resp.set_cookie('session', value='logged_in', httponly=False, samesite='None', secure=True)
-                # 允许跨域携带凭证
-                resp.headers.add('Access-Control-Allow-Origin', '*')
-                resp.headers.add('Access-Control-Allow-Credentials', 'true')
-                return resp
+        # 检测是否为小程序请求
+        user_agent = request.headers.get('User-Agent', '')
+        is_miniprogram = 'MicroMessenger' in user_agent
+        
+        if user:
+            stored_password = user['password']
+            if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+                login_user(User(email))
+                # 将用户 ID 存入 session
+                session['user_id'] = email
+                
+                if is_miniprogram:
+                    # 🌟 小程序登录成功：返回 JSON + 设置 Cookie
+                    resp = jsonify({'success': True, 'message': '登录成功'})
+                    return resp
+                else:
+                    flash(f'🐱 欢迎回来，{user["username"]}！', 'success')
+                    return redirect(url_for('index'))
             else:
-                # 网页版登录：返回页面
-                flash(f'🐱 欢迎回来，{user["username"]}！', 'success')
-                return redirect(url_for('index'))
+                if is_miniprogram:
+                    return jsonify({'success': False, 'message': '密码错误'}), 401
+                else:
+                    flash('😿 密码错误，再试一次吧', 'danger')
+                    return render_template('login.html')
         else:
-            # 登录失败逻辑...
-            # (保持原有代码不变)
-            pass
+            if is_miniprogram:
+                return jsonify({'success': False, 'message': '该邮箱未注册'}), 401
+            else:
+                flash('😿 该邮箱未注册，请先注册', 'warning')
+                return render_template('login.html')
+    
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -284,6 +334,7 @@ def register():
 @login_required
 def logout():
     logout_user()
+    session.clear()
     flash('🐱 已退出，下次见~', 'info')
     return redirect(url_for('login'))
 
@@ -294,7 +345,7 @@ def index():
     username = user['username'] if user else '用户'
     return render_template('index.html', username=username, email=current_user.email)
 
-# ===== 忘记密码（唯一路由） =====
+# ===== 忘记密码 =====
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
@@ -412,20 +463,54 @@ def test_email():
     else:
         return '❌ 邮件发送失败，请查看 Render 日志'
 
-# ===== 🚀 修改2：API接口（强制返回JSON，不返回HTML） =====
+# ===== 🌟 修改：API 接口（增加手动 Cookie 验证，确保小程序能用） =====
+
+def get_user_from_request():
+    """从请求中获取当前用户，支持 Cookie 头"""
+    # 先尝试 Flask-Login 的 current_user
+    if current_user.is_authenticated:
+        return current_user.email
+    
+    # 从 Cookie 头中解析
+    cookie_header = request.headers.get('Cookie', '')
+    cookies = {}
+    for item in cookie_header.split(';'):
+        item = item.strip()
+        if '=' in item:
+            key, value = item.split('=', 1)
+            cookies[key] = value
+    
+    # 尝试从 session 中获取用户
+    if 'user_id' in session:
+        return session.get('user_id')
+    
+    # 如果 Cookie 中有 session，尝试解析
+    if 'session' in cookies:
+        # 这里可以添加更复杂的 session 解析逻辑
+        pass
+    
+    return None
 
 @app.route('/api/records', methods=['GET'])
-@login_required
 def api_get_records():
+    """获取记账记录 - 手动验证，不依赖 @login_required"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录，请先登录'}), 401
+    
     try:
-        records = get_records(current_user.email)
+        records = get_records(user_email)
         return jsonify([dict(r) for r in records])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/add', methods=['POST'])
-@login_required
 def api_add_record():
+    """添加记账记录 - 手动验证"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录，请先登录'}), 401
+    
     try:
         data = request.get_json()
         if not data:
@@ -438,25 +523,33 @@ def api_add_record():
         type_ = data.get('type', '支出')
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        add_record(current_user.email, date, category, amount, note, type_, created_at)
+        add_record(user_email, date, category, amount, note, type_, created_at)
         return jsonify({'success': True, 'message': '添加成功'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/delete/<int:record_id>', methods=['DELETE'])
-@login_required
 def api_delete_record(record_id):
+    """删除记账记录 - 手动验证"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录，请先登录'}), 401
+    
     try:
-        delete_record(record_id, current_user.email)
+        delete_record(record_id, user_email)
         return jsonify({'success': True, 'message': '删除成功'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/stats', methods=['GET'])
-@login_required
 def api_get_stats():
+    """获取统计数据 - 手动验证"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录，请先登录'}), 401
+    
     try:
-        records = get_records(current_user.email)
+        records = get_records(user_email)
         now = datetime.now()
         month_str = f"{now.year}-{now.month:02d}"
         
@@ -483,10 +576,14 @@ def api_get_stats():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/weekly_stats', methods=['GET'])
-@login_required
 def api_get_weekly_stats():
+    """获取本周统计数据 - 手动验证"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录，请先登录'}), 401
+    
     try:
-        records = get_records(current_user.email)
+        records = get_records(user_email)
         now = datetime.now()
         start = now - timedelta(days=now.weekday())
         end = start + timedelta(days=6)
@@ -513,10 +610,14 @@ def api_get_weekly_stats():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/monthly_stats', methods=['GET'])
-@login_required
 def api_get_monthly_stats():
+    """获取本月统计数据 - 手动验证"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录，请先登录'}), 401
+    
     try:
-        records = get_records(current_user.email)
+        records = get_records(user_email)
         now = datetime.now()
         month_str = f"{now.year}-{now.month:02d}"
         
