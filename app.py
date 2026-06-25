@@ -9,28 +9,26 @@ import uuid
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import requests
+import random
+import string
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey123456'
 
-# ===== 🌟 新增：从请求头读取 Cookie 的钩子 =====
+# ===== 🌟 从请求头读取 Cookie 的钩子 =====
 @app.before_request
 def load_user_from_cookie_header():
     """从请求头中的 Cookie 手动加载用户，解决小程序携带 Cookie 的问题"""
-    # 如果是静态资源或登录页面，跳过
     if request.endpoint in ['static', 'serve_bg']:
         return
     
-    # 如果已经登录，直接返回
     if current_user.is_authenticated:
         return
     
-    # 从请求头获取 Cookie
     cookie_header = request.headers.get('Cookie')
     if not cookie_header:
         return
     
-    # 解析 Cookie
     cookies = {}
     for item in cookie_header.split(';'):
         item = item.strip()
@@ -38,12 +36,8 @@ def load_user_from_cookie_header():
             key, value = item.split('=', 1)
             cookies[key] = value
     
-    # 如果 session 存在，尝试从 session 中恢复用户
     if 'session' in cookies:
-        # 尝试从 session 中获取用户邮箱
-        # 这里使用 Flask 的 session 机制
         try:
-            # 如果有 session 数据，尝试加载用户
             from flask import session as flask_session
             if 'user_id' in flask_session:
                 user_email = flask_session.get('user_id')
@@ -60,27 +54,22 @@ NETEASE_EMAIL = "18024679346@163.com"
 NETEASE_AUTH_CODE = "CNTzzMEFunsYhD8w"
 
 def send_email(to_email, subject, body):
-    """通过网易邮箱 SMTP 发送邮件"""
     import smtplib
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
-
     try:
         smtp_server = "smtp.163.com"
         smtp_port = 465
-
         msg = MIMEMultipart()
         msg["From"] = f"小鱼干记账本 <{NETEASE_EMAIL}>"
         msg["To"] = to_email
         msg["Subject"] = subject
         html_content = body.replace('\n', '<br>')
         msg.attach(MIMEText(html_content, "html", "utf-8"))
-
         server = smtplib.SMTP_SSL(smtp_server, smtp_port)
         server.login(NETEASE_EMAIL, NETEASE_AUTH_CODE)
         server.sendmail(NETEASE_EMAIL, to_email, msg.as_string())
         server.quit()
-        
         app.logger.info(f"[网易] 邮件发送成功 → {to_email}")
         return True
     except Exception as e:
@@ -101,11 +90,10 @@ def get_db_connection():
         )
 
 def init_db():
-    """初始化数据库表，自动添加缺失字段"""
     conn = get_db_connection()
     cur = conn.cursor()
     
-    # 创建用户表（基础表）
+    # 创建用户表
     cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
             email TEXT PRIMARY KEY,
@@ -115,7 +103,7 @@ def init_db():
         )
     ''')
     
-    # ===== 检查并添加字段 =====
+    # 检查并添加字段
     cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users'")
     columns = [row[0] for row in cur.fetchall()]
     
@@ -134,6 +122,11 @@ def init_db():
     if 'security_answer' not in columns:
         cur.execute('ALTER TABLE users ADD COLUMN security_answer TEXT')
         print("✅ 已添加 security_answer 字段")
+    
+    # ⭐ 新增：openid 字段（微信登录用）
+    if 'openid' not in columns:
+        cur.execute('ALTER TABLE users ADD COLUMN openid TEXT UNIQUE')
+        print("✅ 已添加 openid 字段")
     
     # 创建记录表
     cur.execute('''
@@ -165,12 +158,21 @@ def get_user(email):
     conn.close()
     return user
 
-def save_user(email, username, hashed_password, created_at, security_question=None, security_answer=None):
+def get_user_by_openid(openid):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute('SELECT * FROM users WHERE openid = %s', (openid,))
+    user = cur.fetchone()
+    cur.close()
+    conn.close()
+    return user
+
+def save_user(email, username, hashed_password, created_at, security_question=None, security_answer=None, openid=None):
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
-        'INSERT INTO users (email, username, password, created_at, security_question, security_answer) VALUES (%s, %s, %s, %s, %s, %s)',
-        (email, username, hashed_password, created_at, security_question, security_answer)
+        'INSERT INTO users (email, username, password, created_at, security_question, security_answer, openid) VALUES (%s, %s, %s, %s, %s, %s, %s)',
+        (email, username, hashed_password, created_at, security_question, security_answer, openid)
     )
     conn.commit()
     cur.close()
@@ -190,6 +192,15 @@ def update_user_password(email, new_hashed_password):
     cur = conn.cursor()
     cur.execute('UPDATE users SET password = %s, reset_token = NULL, reset_token_expiry = NULL WHERE email = %s',
                 (new_hashed_password, email))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def update_user_openid(email, openid):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('UPDATE users SET openid = %s WHERE email = %s',
+                (openid, email))
     conn.commit()
     cur.close()
     conn.close()
@@ -252,7 +263,7 @@ def load_user(email):
 def serve_bg():
     return send_file('bg_pattern.png', mimetype='image/png')
 
-# ===== 🌟 修改：登录路由（支持小程序） =====
+# ===== 邮箱登录 =====
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -261,7 +272,6 @@ def login():
         
         user = get_user(email)
         
-        # 检测是否为小程序请求
         user_agent = request.headers.get('User-Agent', '')
         is_miniprogram = 'MicroMessenger' in user_agent
         
@@ -269,11 +279,9 @@ def login():
             stored_password = user['password']
             if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
                 login_user(User(email))
-                # 将用户 ID 存入 session
                 session['user_id'] = email
                 
                 if is_miniprogram:
-                    # 🌟 小程序登录成功：返回 JSON + 设置 Cookie
                     resp = jsonify({'success': True, 'message': '登录成功'})
                     return resp
                 else:
@@ -385,7 +393,6 @@ def forgot_password():
     
     return render_template('forgot_password.html')
 
-# ===== 安全问题验证备用路由 =====
 @app.route('/forgot_password_security', methods=['GET', 'POST'])
 def forgot_password_security():
     email = request.args.get('email')
@@ -463,15 +470,138 @@ def test_email():
     else:
         return '❌ 邮件发送失败，请查看 Render 日志'
 
-# ===== 🌟 修改：API 接口（增加手动 Cookie 验证，确保小程序能用） =====
+# ===== ⭐ 微信登录接口 =====
+@app.route('/api/wx_login', methods=['POST'])
+def wx_login():
+    """微信登录：用 code 换 openid"""
+    data = request.get_json()
+    code = data.get('code')
+    
+    if not code:
+        return jsonify({'success': False, 'message': '缺少code'}), 400
+    
+    # 从环境变量读取 AppSecret，更安全
+    appid = 'wx815a44cbe9f4fc89'
+    secret = os.environ.get('WX_SECRET', '')
+    
+    if not secret:
+        print("❌ 错误：WX_SECRET 环境变量未设置！")
+        return jsonify({'success': False, 'message': '服务器配置错误'}), 500
+    
+    url = f'https://api.weixin.qq.com/sns/jscode2session?appid={appid}&secret={secret}&js_code={code}&grant_type=authorization_code'
+    
+    try:
+        resp = requests.get(url, timeout=10)
+        wx_data = resp.json()
+        print(f"🔍 微信返回: {wx_data}")
+        
+        if 'errcode' in wx_data and wx_data['errcode'] != 0:
+            return jsonify({'success': False, 'message': wx_data.get('errmsg', '微信登录失败')}), 400
+        
+        openid = wx_data.get('openid')
+        session_key = wx_data.get('session_key')
+        
+        if not openid:
+            return jsonify({'success': False, 'message': '获取openid失败'}), 400
+        
+        # 查数据库：这个 openid 是否已绑定用户
+        user = get_user_by_openid(openid)
+        
+        if user:
+            # 已有用户，直接登录
+            login_user(User(user['email']))
+            session['user_id'] = user['email']
+            return jsonify({
+                'success': True,
+                'message': '登录成功',
+                'is_new': False,
+                'user': {'email': user['email'], 'username': user['username']}
+            })
+        else:
+            # 新用户：返回 openid，让前端引导绑定邮箱
+            return jsonify({
+                'success': True,
+                'message': '请绑定邮箱',
+                'is_new': True,
+                'openid': openid
+            })
+            
+    except requests.exceptions.Timeout:
+        print("❌ 微信接口超时")
+        return jsonify({'success': False, 'message': '微信接口超时，请重试'}), 500
+    except Exception as e:
+        print(f"❌ 微信登录异常: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
+# ===== ⭐ 微信用户绑定邮箱接口 =====
+@app.route('/api/bind_email', methods=['POST'])
+def bind_email():
+    """微信用户绑定邮箱"""
+    data = request.get_json()
+    openid = data.get('openid')
+    email = data.get('email')
+    username = data.get('username', '微信用户')
+    
+    if not openid or not email:
+        return jsonify({'success': False, 'message': '缺少参数'}), 400
+    
+    if not is_valid_email(email):
+        return jsonify({'success': False, 'message': '邮箱格式不正确'}), 400
+    
+    # 检查邮箱是否已被注册
+    if get_user(email):
+        return jsonify({'success': False, 'message': '该邮箱已被绑定，请直接登录'}), 400
+    
+    # 检查 openid 是否已被绑定（防止并发重复绑定）
+    if get_user_by_openid(openid):
+        return jsonify({'success': False, 'message': '该微信已绑定其他账号'}), 400
+    
+    # 生成随机密码（用户以后可以用邮箱+密码登录）
+    random_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+    hashed = bcrypt.hashpw(random_password.encode('utf-8'), bcrypt.gensalt())
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    try:
+        save_user(email, username, hashed.decode('utf-8'), created_at, None, None, openid)
+        
+        # 自动登录
+        user = get_user(email)
+        login_user(User(email))
+        session['user_id'] = email
+        
+        return jsonify({
+            'success': True,
+            'message': '绑定成功',
+            'user': {'email': email, 'username': username}
+        })
+    except Exception as e:
+        print(f"❌ 绑定失败: {e}")
+        return jsonify({'success': False, 'message': '绑定失败，请重试'}), 500
+
+# ===== 获取用户信息接口 =====
+@app.route('/api/user_info', methods=['GET'])
+def api_user_info():
+    """获取当前用户信息"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录'}), 401
+    
+    user = get_user(user_email)
+    if not user:
+        return jsonify({'error': '用户不存在'}), 404
+    
+    return jsonify({
+        'email': user['email'],
+        'username': user['username'],
+        'has_openid': bool(user.get('openid'))
+    })
+
+# ===== 从请求中获取用户 =====
 def get_user_from_request():
     """从请求中获取当前用户，支持 Cookie 头"""
-    # 先尝试 Flask-Login 的 current_user
     if current_user.is_authenticated:
         return current_user.email
     
-    # 从 Cookie 头中解析
     cookie_header = request.headers.get('Cookie', '')
     cookies = {}
     for item in cookie_header.split(';'):
@@ -480,20 +610,14 @@ def get_user_from_request():
             key, value = item.split('=', 1)
             cookies[key] = value
     
-    # 尝试从 session 中获取用户
     if 'user_id' in session:
         return session.get('user_id')
     
-    # 如果 Cookie 中有 session，尝试解析
-    if 'session' in cookies:
-        # 这里可以添加更复杂的 session 解析逻辑
-        pass
-    
     return None
 
+# ===== API 接口 =====
 @app.route('/api/records', methods=['GET'])
 def api_get_records():
-    """获取记账记录 - 手动验证，不依赖 @login_required"""
     user_email = get_user_from_request()
     if not user_email:
         return jsonify({'error': '未登录，请先登录'}), 401
@@ -506,7 +630,6 @@ def api_get_records():
 
 @app.route('/api/add', methods=['POST'])
 def api_add_record():
-    """添加记账记录 - 手动验证"""
     user_email = get_user_from_request()
     if not user_email:
         return jsonify({'error': '未登录，请先登录'}), 401
@@ -530,7 +653,6 @@ def api_add_record():
 
 @app.route('/api/delete/<int:record_id>', methods=['DELETE'])
 def api_delete_record(record_id):
-    """删除记账记录 - 手动验证"""
     user_email = get_user_from_request()
     if not user_email:
         return jsonify({'error': '未登录，请先登录'}), 401
@@ -543,7 +665,6 @@ def api_delete_record(record_id):
 
 @app.route('/api/stats', methods=['GET'])
 def api_get_stats():
-    """获取统计数据 - 手动验证"""
     user_email = get_user_from_request()
     if not user_email:
         return jsonify({'error': '未登录，请先登录'}), 401
@@ -577,7 +698,6 @@ def api_get_stats():
 
 @app.route('/api/weekly_stats', methods=['GET'])
 def api_get_weekly_stats():
-    """获取本周统计数据 - 手动验证"""
     user_email = get_user_from_request()
     if not user_email:
         return jsonify({'error': '未登录，请先登录'}), 401
@@ -598,12 +718,20 @@ def api_get_weekly_stats():
         total_income = sum(r['amount'] for r in week_records if r['type'] == '收入')
         total_expense = sum(r['amount'] for r in week_records if r['type'] == '支出')
         
+        # 统计分类
+        categories = {}
+        for r in week_records:
+            if r['type'] == '支出':
+                cat = r['category']
+                categories[cat] = categories.get(cat, 0.0) + r['amount']
+        
         return jsonify({
             'start': start.strftime("%Y-%m-%d"),
             'end': end.strftime("%Y-%m-%d"),
             'income': total_income,
             'expense': total_expense,
             'balance': total_income - total_expense,
+            'categories': categories,
             'records': week_records
         })
     except Exception as e:
@@ -611,7 +739,6 @@ def api_get_weekly_stats():
 
 @app.route('/api/monthly_stats', methods=['GET'])
 def api_get_monthly_stats():
-    """获取本月统计数据 - 手动验证"""
     user_email = get_user_from_request()
     if not user_email:
         return jsonify({'error': '未登录，请先登录'}), 401
@@ -691,7 +818,6 @@ def export_excel():
     )
 
 # ===== 启动 =====
-
 if __name__ == '__main__':
     init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)
