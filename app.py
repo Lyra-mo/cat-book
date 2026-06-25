@@ -210,8 +210,7 @@ def load_user(email):
 def serve_bg():
     return send_file('bg_pattern.png', mimetype='image/png')
 
-# ===== 路由 =====
-
+# ===== 🚀 修改1：登录路由（支持小程序JSON响应） =====
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -219,16 +218,39 @@ def login():
         password = request.form.get('password')
         
         user = get_user(email)
+        
+        # 检测是否为小程序请求（通过Accept头或自定义头）
+        is_miniprogram = False
+        accept_header = request.headers.get('Accept', '')
+        if 'application/json' in accept_header:
+            is_miniprogram = True
+        # 也可以用小程序的User-Agent判断
+        user_agent = request.headers.get('User-Agent', '')
+        if 'MicroMessenger' in user_agent and 'miniProgram' in user_agent:
+            is_miniprogram = True
+        
         if user:
             stored_password = user['password']
             if bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
                 login_user(User(email))
-                flash(f'🐱 欢迎回来，{user["username"]}！', 'success')
-                return redirect(url_for('index'))
+                if is_miniprogram:
+                    # 小程序登录成功 → 返回JSON
+                    return jsonify({'success': True, 'message': '登录成功'})
+                else:
+                    flash(f'🐱 欢迎回来，{user["username"]}！', 'success')
+                    return redirect(url_for('index'))
             else:
-                flash('😿 密码错误，再试一次吧', 'danger')
+                if is_miniprogram:
+                    return jsonify({'success': False, 'message': '密码错误'}), 401
+                else:
+                    flash('😿 密码错误，再试一次吧', 'danger')
+                    return render_template('login.html')
         else:
-            flash('😿 该邮箱未注册，请先注册', 'warning')
+            if is_miniprogram:
+                return jsonify({'success': False, 'message': '该邮箱未注册'}), 401
+            else:
+                flash('😿 该邮箱未注册，请先注册', 'warning')
+                return render_template('login.html')
     
     return render_template('login.html')
 
@@ -400,116 +422,137 @@ def test_email():
     else:
         return '❌ 邮件发送失败，请查看 Render 日志'
 
-# ===== API 接口 =====
+# ===== 🚀 修改2：API接口（强制返回JSON，不返回HTML） =====
 
 @app.route('/api/records', methods=['GET'])
 @login_required
 def api_get_records():
-    records = get_records(current_user.email)
-    return jsonify([dict(r) for r in records])
+    try:
+        records = get_records(current_user.email)
+        return jsonify([dict(r) for r in records])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/add', methods=['POST'])
 @login_required
 def api_add_record():
-    data = request.json
-    date = data.get('date', datetime.now().strftime("%Y-%m-%d"))
-    category = data.get('category', '其他')
-    amount = float(data.get('amount', 0))
-    note = data.get('note', '')
-    type_ = data.get('type', '支出')
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    add_record(current_user.email, date, category, amount, note, type_, created_at)
-    return jsonify({'success': True})
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': '请求体必须是JSON格式'}), 400
+        
+        date = data.get('date', datetime.now().strftime("%Y-%m-%d"))
+        category = data.get('category', '其他')
+        amount = float(data.get('amount', 0))
+        note = data.get('note', '')
+        type_ = data.get('type', '支出')
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        add_record(current_user.email, date, category, amount, note, type_, created_at)
+        return jsonify({'success': True, 'message': '添加成功'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/delete/<int:record_id>', methods=['DELETE'])
 @login_required
 def api_delete_record(record_id):
-    delete_record(record_id, current_user.email)
-    return jsonify({'success': True})
+    try:
+        delete_record(record_id, current_user.email)
+        return jsonify({'success': True, 'message': '删除成功'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/stats', methods=['GET'])
 @login_required
 def api_get_stats():
-    records = get_records(current_user.email)
-    now = datetime.now()
-    month_str = f"{now.year}-{now.month:02d}"
-    
-    income = 0.0
-    expense = 0.0
-    categories = {}
-    
-    for r in records:
-        if r['date'].startswith(month_str):
-            if r['type'] == '收入':
-                income += r['amount']
-            else:
-                expense += r['amount']
-                cat = r['category']
-                categories[cat] = categories.get(cat, 0.0) + r['amount']
-    
-    return jsonify({
-        'income': income,
-        'expense': expense,
-        'balance': income - expense,
-        'categories': categories
-    })
+    try:
+        records = get_records(current_user.email)
+        now = datetime.now()
+        month_str = f"{now.year}-{now.month:02d}"
+        
+        income = 0.0
+        expense = 0.0
+        categories = {}
+        
+        for r in records:
+            if r['date'].startswith(month_str):
+                if r['type'] == '收入':
+                    income += r['amount']
+                else:
+                    expense += r['amount']
+                    cat = r['category']
+                    categories[cat] = categories.get(cat, 0.0) + r['amount']
+        
+        return jsonify({
+            'income': income,
+            'expense': expense,
+            'balance': income - expense,
+            'categories': categories
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/weekly_stats', methods=['GET'])
 @login_required
 def api_get_weekly_stats():
-    records = get_records(current_user.email)
-    now = datetime.now()
-    start = now - timedelta(days=now.weekday())
-    end = start + timedelta(days=6)
-    
-    week_records = []
-    for r in records:
-        if r.get('date'):
-            record_date = datetime.strptime(r['date'], "%Y-%m-%d")
-            if start <= record_date <= end:
-                week_records.append(r)
-    
-    total_income = sum(r['amount'] for r in week_records if r['type'] == '收入')
-    total_expense = sum(r['amount'] for r in week_records if r['type'] == '支出')
-    
-    return jsonify({
-        'start': start.strftime("%Y-%m-%d"),
-        'end': end.strftime("%Y-%m-%d"),
-        'income': total_income,
-        'expense': total_expense,
-        'balance': total_income - total_expense,
-        'records': week_records
-    })
+    try:
+        records = get_records(current_user.email)
+        now = datetime.now()
+        start = now - timedelta(days=now.weekday())
+        end = start + timedelta(days=6)
+        
+        week_records = []
+        for r in records:
+            if r.get('date'):
+                record_date = datetime.strptime(r['date'], "%Y-%m-%d")
+                if start <= record_date <= end:
+                    week_records.append(r)
+        
+        total_income = sum(r['amount'] for r in week_records if r['type'] == '收入')
+        total_expense = sum(r['amount'] for r in week_records if r['type'] == '支出')
+        
+        return jsonify({
+            'start': start.strftime("%Y-%m-%d"),
+            'end': end.strftime("%Y-%m-%d"),
+            'income': total_income,
+            'expense': total_expense,
+            'balance': total_income - total_expense,
+            'records': week_records
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/monthly_stats', methods=['GET'])
 @login_required
 def api_get_monthly_stats():
-    records = get_records(current_user.email)
-    now = datetime.now()
-    month_str = f"{now.year}-{now.month:02d}"
-    
-    income = 0.0
-    expense = 0.0
-    categories = {}
-    
-    for r in records:
-        if r['date'].startswith(month_str):
-            if r['type'] == '收入':
-                income += r['amount']
-            else:
-                expense += r['amount']
-                cat = r['category']
-                categories[cat] = categories.get(cat, 0.0) + r['amount']
-    
-    return jsonify({
-        'year': now.year,
-        'month': now.month,
-        'income': income,
-        'expense': expense,
-        'balance': income - expense,
-        'categories': categories
-    })
+    try:
+        records = get_records(current_user.email)
+        now = datetime.now()
+        month_str = f"{now.year}-{now.month:02d}"
+        
+        income = 0.0
+        expense = 0.0
+        categories = {}
+        
+        for r in records:
+            if r['date'].startswith(month_str):
+                if r['type'] == '收入':
+                    income += r['amount']
+                else:
+                    expense += r['amount']
+                    cat = r['category']
+                    categories[cat] = categories.get(cat, 0.0) + r['amount']
+        
+        return jsonify({
+            'year': now.year,
+            'month': now.month,
+            'income': income,
+            'expense': expense,
+            'balance': income - expense,
+            'categories': categories
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ===== 导出 Excel =====
 @app.route('/api/export_excel', methods=['GET'])
