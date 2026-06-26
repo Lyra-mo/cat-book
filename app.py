@@ -234,6 +234,45 @@ def delete_record(record_id, email):
     cur.close()
     conn.close()
 
+def update_record(record_id, email, date=None, category=None, amount=None, note=None, type_=None):
+    """更新记录"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    update_fields = []
+    params = []
+    
+    if date is not None:
+        update_fields.append("date = %s")
+        params.append(date)
+    if category is not None:
+        update_fields.append("category = %s")
+        params.append(category)
+    if amount is not None:
+        update_fields.append("amount = %s")
+        params.append(float(amount))
+    if note is not None:
+        update_fields.append("note = %s")
+        params.append(note)
+    if type_ is not None:
+        update_fields.append("type = %s")
+        params.append(type_)
+    
+    if not update_fields:
+        return 0
+    
+    params.append(email)
+    params.append(record_id)
+    
+    sql = f"UPDATE records SET {', '.join(update_fields)} WHERE user_email = %s AND id = %s"
+    cur.execute(sql, params)
+    conn.commit()
+    
+    affected = cur.rowcount
+    cur.close()
+    conn.close()
+    return affected
+
 # ===== 验证 =====
 def is_valid_email(email):
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -523,6 +562,7 @@ def bind_wechat():
     conn.close()
     
     return jsonify({'success': True, 'message': '绑定成功'})
+
 @app.route('/api/wx_login', methods=['POST'])
 def wx_login():
     """微信登录：用 code 换 openid"""
@@ -696,7 +736,9 @@ def api_delete_record(record_id):
         return jsonify({'success': True, 'message': '删除成功'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
-        @app.route('/api/update/<int:record_id>', methods=['PUT'])
+
+# ===== ⭐ 更新记录接口 =====
+@app.route('/api/update/<int:record_id>', methods=['PUT'])
 def api_update_record(record_id):
     """更新记账记录"""
     user_email = get_user_from_request()
@@ -708,50 +750,20 @@ def api_update_record(record_id):
         if not data:
             return jsonify({'success': False, 'message': '请求体必须是JSON格式'}), 400
         
-        # 获取要更新的字段
         date = data.get('date')
         category = data.get('category')
         amount = data.get('amount')
         note = data.get('note')
         type_ = data.get('type')
         
-        # 构建更新 SQL
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        update_fields = []
-        params = []
-        
-        if date is not None:
-            update_fields.append("date = %s")
-            params.append(date)
-        if category is not None:
-            update_fields.append("category = %s")
-            params.append(category)
-        if amount is not None:
-            update_fields.append("amount = %s")
-            params.append(float(amount))
-        if note is not None:
-            update_fields.append("note = %s")
-            params.append(note)
-        if type_ is not None:
-            update_fields.append("type = %s")
-            params.append(type_)
-        
-        if not update_fields:
-            return jsonify({'success': False, 'message': '没有要更新的字段'}), 400
-        
-        # 添加 user_email 条件，确保只能更新自己的记录
-        params.append(user_email)
-        params.append(record_id)
-        
-        sql = f"UPDATE records SET {', '.join(update_fields)} WHERE user_email = %s AND id = %s"
-        cur.execute(sql, params)
-        conn.commit()
-        
-        affected = cur.rowcount
-        cur.close()
-        conn.close()
+        affected = update_record(
+            record_id, user_email,
+            date=date,
+            category=category,
+            amount=amount,
+            note=note,
+            type_=type_
+        )
         
         if affected == 0:
             return jsonify({'success': False, 'message': '记录不存在或无权限'}), 404
