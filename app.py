@@ -696,6 +696,71 @@ def api_delete_record(record_id):
         return jsonify({'success': True, 'message': '删除成功'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+        @app.route('/api/update/<int:record_id>', methods=['PUT'])
+def api_update_record(record_id):
+    """更新记账记录"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录，请先登录'}), 401
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': '请求体必须是JSON格式'}), 400
+        
+        # 获取要更新的字段
+        date = data.get('date')
+        category = data.get('category')
+        amount = data.get('amount')
+        note = data.get('note')
+        type_ = data.get('type')
+        
+        # 构建更新 SQL
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        update_fields = []
+        params = []
+        
+        if date is not None:
+            update_fields.append("date = %s")
+            params.append(date)
+        if category is not None:
+            update_fields.append("category = %s")
+            params.append(category)
+        if amount is not None:
+            update_fields.append("amount = %s")
+            params.append(float(amount))
+        if note is not None:
+            update_fields.append("note = %s")
+            params.append(note)
+        if type_ is not None:
+            update_fields.append("type = %s")
+            params.append(type_)
+        
+        if not update_fields:
+            return jsonify({'success': False, 'message': '没有要更新的字段'}), 400
+        
+        # 添加 user_email 条件，确保只能更新自己的记录
+        params.append(user_email)
+        params.append(record_id)
+        
+        sql = f"UPDATE records SET {', '.join(update_fields)} WHERE user_email = %s AND id = %s"
+        cur.execute(sql, params)
+        conn.commit()
+        
+        affected = cur.rowcount
+        cur.close()
+        conn.close()
+        
+        if affected == 0:
+            return jsonify({'success': False, 'message': '记录不存在或无权限'}), 404
+        
+        return jsonify({'success': True, 'message': '更新成功'})
+        
+    except Exception as e:
+        print(f"❌ 更新失败: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/stats', methods=['GET'])
 def api_get_stats():
