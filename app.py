@@ -630,24 +630,6 @@ def bind_email():
         print(f"❌ 绑定失败: {e}")
         return jsonify({'success': False, 'message': '绑定失败，请重试'}), 500
 
-# ===== 获取用户信息接口 =====
-@app.route('/api/user_info', methods=['GET'])
-def api_user_info():
-    """获取当前用户信息"""
-    user_email = get_user_from_request()
-    if not user_email:
-        return jsonify({'error': '未登录'}), 401
-    
-    user = get_user(user_email)
-    if not user:
-        return jsonify({'error': '用户不存在'}), 404
-    
-    return jsonify({
-        'email': user['email'],
-        'username': user['username'],
-        'has_openid': bool(user.get('openid'))
-    })
-
 # ===== 从请求中获取用户 =====
 def get_user_from_request():
     """从请求中获取当前用户，支持 Cookie 头"""
