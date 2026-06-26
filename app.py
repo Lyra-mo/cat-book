@@ -471,6 +471,58 @@ def test_email():
         return '❌ 邮件发送失败，请查看 Render 日志'
 
 # ===== ⭐ 微信登录接口 =====
+# ===== ⭐ 获取用户信息接口 =====
+@app.route('/api/user_info', methods=['GET'])
+def api_user_info():
+    """获取当前用户信息"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录'}), 401
+    
+    user = get_user(user_email)
+    if not user:
+        return jsonify({'error': '用户不存在'}), 404
+    
+    return jsonify({
+        'email': user['email'],
+        'username': user['username'],
+        'has_openid': bool(user.get('openid'))
+    })
+
+# ===== ⭐ 老用户绑定微信接口 =====
+@app.route('/api/bind_wechat', methods=['POST'])
+def bind_wechat():
+    """老用户绑定微信 openid"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录'}), 401
+    
+    data = request.get_json()
+    openid = data.get('openid')
+    
+    if not openid:
+        return jsonify({'success': False, 'message': '缺少openid'}), 400
+    
+    # 检查这个 openid 是否已被其他账号绑定
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute('SELECT * FROM users WHERE openid = %s', (openid,))
+    existing = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if existing:
+        return jsonify({'success': False, 'message': '该微信已绑定其他账号'}), 400
+    
+    # 更新当前用户的 openid
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('UPDATE users SET openid = %s WHERE email = %s', (openid, user_email))
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    return jsonify({'success': True, 'message': '绑定成功'})
 @app.route('/api/wx_login', methods=['POST'])
 def wx_login():
     """微信登录：用 code 换 openid"""
