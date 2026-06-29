@@ -736,6 +736,93 @@ def api_delete_record(record_id):
         return jsonify({'success': True, 'message': '删除成功'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+        # ===== ⭐ 自定义周统计接口 =====
+@app.route('/api/weekly_stats_custom', methods=['POST'])
+def api_weekly_stats_custom():
+    """自定义周统计：传入起始日期，统计该周"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录，请先登录'}), 401
+    
+    try:
+        data = request.get_json()
+        start_date_str = data.get('start_date')
+        if not start_date_str:
+            return jsonify({'error': '缺少起始日期'}), 400
+        
+        start = datetime.strptime(start_date_str, "%Y-%m-%d")
+        end = start + timedelta(days=6)
+        
+        records = get_records(user_email)
+        week_records = []
+        for r in records:
+            if r.get('date'):
+                record_date = datetime.strptime(r['date'], "%Y-%m-%d")
+                if start <= record_date <= end:
+                    week_records.append(r)
+        
+        total_income = sum(r['amount'] for r in week_records if r['type'] == '收入')
+        total_expense = sum(r['amount'] for r in week_records if r['type'] == '支出')
+        
+        categories = {}
+        for r in week_records:
+            if r['type'] == '支出':
+                cat = r['category']
+                categories[cat] = categories.get(cat, 0.0) + r['amount']
+        
+        return jsonify({
+            'start': start.strftime("%Y-%m-%d"),
+            'end': end.strftime("%Y-%m-%d"),
+            'income': total_income,
+            'expense': total_expense,
+            'balance': total_income - total_expense,
+            'categories': categories,
+            'records': week_records
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ===== ⭐ 自定义月统计接口 =====
+@app.route('/api/monthly_stats_custom', methods=['POST'])
+def api_monthly_stats_custom():
+    """自定义月统计：传入年月，统计该月"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录，请先登录'}), 401
+    
+    try:
+        data = request.get_json()
+        year = data.get('year')
+        month = data.get('month')
+        if not year or not month:
+            return jsonify({'error': '缺少年月参数'}), 400
+        
+        month_str = f"{year}-{int(month):02d}"
+        
+        records = get_records(user_email)
+        income = 0.0
+        expense = 0.0
+        categories = {}
+        
+        for r in records:
+            if r['date'].startswith(month_str):
+                if r['type'] == '收入':
+                    income += r['amount']
+                else:
+                    expense += r['amount']
+                    cat = r['category']
+                    categories[cat] = categories.get(cat, 0.0) + r['amount']
+        
+        return jsonify({
+            'year': year,
+            'month': month,
+            'income': income,
+            'expense': expense,
+            'balance': income - expense,
+            'categories': categories
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ===== ⭐ 更新记录接口 =====
 @app.route('/api/update/<int:record_id>', methods=['PUT'])
