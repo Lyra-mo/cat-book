@@ -736,6 +736,51 @@ def api_delete_record(record_id):
         return jsonify({'success': True, 'message': '删除成功'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+        # ===== ⭐ 统计上个月薪资总额 =====
+@app.route('/api/last_month_salary', methods=['GET'])
+def api_last_month_salary():
+    """统计上个月的收入总额（薪资）"""
+    user_email = get_user_from_request()
+    if not user_email:
+        return jsonify({'error': '未登录，请先登录'}), 401
+    
+    try:
+        records = get_records(user_email)
+        
+        # 计算上个月的月份
+        now = datetime.now()
+        if now.month == 1:
+            last_month = 12
+            last_month_year = now.year - 1
+        else:
+            last_month = now.month - 1
+            last_month_year = now.year
+        
+        # 构造上个月的月份字符串
+        month_str = f"{last_month_year}-{last_month:02d}"
+        
+        # 统计该月的所有收入
+        total = 0.0
+        count = 0
+        for r in records:
+            if r['date'].startswith(month_str) and r['type'] == '收入':
+                total += r['amount']
+                count += 1
+        
+        # 获取当月几条收入记录（方便展示明细）
+        detail_records = [r for r in records if r['date'].startswith(month_str) and r['type'] == '收入']
+        
+        return jsonify({
+            'success': True,
+            'year': last_month_year,
+            'month': last_month,
+            'total': total,
+            'count': count,
+            'detail': detail_records[:10]  # 最多返回10条明细
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
         # ===== ⭐ 自定义周统计接口 =====
 @app.route('/api/weekly_stats_custom', methods=['POST'])
 def api_weekly_stats_custom():
